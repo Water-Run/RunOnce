@@ -1,0 +1,10 @@
+{
+  "profiles": {
+    "RunOnce (Package)": {
+      "commandName": "MsixPackage"
+    },
+    "RunOnce (Unpackaged)": {
+      "commandName": "Project"
+    }
+  }
+}
