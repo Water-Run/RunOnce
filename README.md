@@ -1,0 +1,24 @@
+# 一次运行
+
+![示例图片](.gif)  
+
+随时随地的运行大模型生成的"一次性"程序.  
+
+## 安装
+
+[微软商店]()  
+
+## 语言支持
+
+支持以下语言:  
+
+- `bat`  
+- `powershell`  
+- `python`  
+- `lua`  
+- `nim`  
+- `php`  
+- `javascript`  
+- `typescript`  
+- `go`  
+- `vbscript`  
