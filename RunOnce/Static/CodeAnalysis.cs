@@ -4,9 +4,9 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace RunOnce.Model
+namespace RunOnce.Common
 {
-    internal class Editor
+    internal class CodeAnalysis
     {
     }
 }
