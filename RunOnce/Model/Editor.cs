@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 
 namespace RunOnce.Model
 {
-    internal class SettingsModel
+    internal class Editor
     {
     }
 }

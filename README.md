@@ -17,8 +17,4 @@
 - `python`  
 - `lua`  
 - `nim`  
-- `php`  
-- `javascript`  
-- `typescript`  
 - `go`  
-- `vbscript`  

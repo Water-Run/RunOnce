@@ -4,9 +4,9 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace RunOnce.Common
+namespace RunOnce.Static
 {
-    internal class TextTranslation
+    internal class Exec
     {
     }
 }

@@ -4,9 +4,9 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace RunOnce.Model
+namespace RunOnce.Static
 {
-    internal class EditorModel
+    internal class Highlight
     {
     }
 }

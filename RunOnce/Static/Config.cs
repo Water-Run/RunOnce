@@ -3,8 +3,8 @@
  * 提供用户设置项与硬编码常量的统一访问入口，支持持久化存储
  * 
  * @author: WaterRun
- * @file: Static/AppConfig.cs
- * @date: 2026-01-27
+ * @file: Static/Config.cs
+ * @date: 2026-01-28
  */
 
 #nullable enable
@@ -15,16 +15,6 @@ using System.Linq;
 using System.Text.Json;
 using Windows.Storage;
 
-/// <summary>
-/// 应用程序配置管理静态类，提供用户设置项与硬编码常量的统一访问入口。
-/// :file: Static/AppConfig.cs
-/// :author: WaterRun
-/// :time: 2026-01-27
-/// </summary>
-/// <remarks>
-/// 职责边界：负责应用程序所有可配置项与硬编码常量的存储、读取、持久化；不负责UI绑定逻辑与业务验证。
-/// 持久化机制：使用 Windows.Storage.ApplicationData.Current.LocalSettings 进行本地持久化存储。
-/// </remarks>
 namespace RunOnce.Static;
 
 /// <summary>
@@ -129,15 +119,15 @@ public readonly record struct ConfidenceRange
     {
         if (lowerBound < MinValue || lowerBound > MaxValue)
         {
-            throw new ArgumentOutOfRangeException(nameof(lowerBound), lowerBound, $"下界必须在 [{MinValue}, {MaxValue}] 范围内。");
+            throw new ArgumentOutOfRangeException(nameof(lowerBound), lowerBound, Text.Localize("下界必须在 [0.0, 1.0] 范围内。"));
         }
         if (upperBound < MinValue || upperBound > MaxValue)
         {
-            throw new ArgumentOutOfRangeException(nameof(upperBound), upperBound, $"上界必须在 [{MinValue}, {MaxValue}] 范围内。");
+            throw new ArgumentOutOfRangeException(nameof(upperBound), upperBound, Text.Localize("上界必须在 [0.0, 1.0] 范围内。"));
         }
         if (lowerBound > upperBound)
         {
-            throw new ArgumentException($"下界 ({lowerBound}) 不能大于上界 ({upperBound})。", nameof(lowerBound));
+            throw new ArgumentException(Text.Localize("下界不能大于上界。"), nameof(lowerBound));
         }
 
         LowerBound = lowerBound;
@@ -148,7 +138,7 @@ public readonly record struct ConfidenceRange
     /// 获取使用默认阈值的置信度范围实例。
     /// </summary>
     /// <value>
-    /// 下界为 0.3，上界为 0.7 的默认置信度范围。
+    /// 下界为 0.7，上界为 0.95 的默认置信度范围。
     /// </value>
     public static ConfidenceRange Default => new(DefaultLowerBound, DefaultUpperBound);
 
@@ -189,7 +179,7 @@ public readonly record struct ConfidenceRange
 /// 线程安全：通过锁机制保证并发访问安全。
 /// 副作用：Setter 操作会立即触发本地持久化存储写入。
 /// </remarks>
-public static class AppConfig
+public static class Config
 {
     /// <summary>
     /// 用于线程同步的锁对象。
@@ -213,9 +203,19 @@ public static class AppConfig
 
     #region 硬编码常量
 
-    /// <summary>软件的显示名称。</summary>
+    /// <summary>软件的显示名称（中文）。</summary>
     /// <value>固定值 "一次运行"，不可更改。</value>
-    public const string AppName = "一次运行";
+    public const string AppNameChinese = "一次运行";
+
+    /// <summary>软件的显示名称（英文）。</summary>
+    /// <value>固定值 "RunOnce"，不可更改。</value>
+    public const string AppNameEnglish = "RunOnce";
+
+    /// <summary>
+    /// 获取本地化的软件显示名称。
+    /// </summary>
+    /// <value>根据当前语言设置返回中文或英文名称。</value>
+    public static string AppName => Text.Localize(AppNameChinese);
 
     /// <summary>软件的当前版本号。</summary>
     /// <value>遵循语义化版本规范，格式为 Major.Minor.Patch。</value>
@@ -370,7 +370,7 @@ public static class AppConfig
             ArgumentNullException.ThrowIfNull(value);
             if (string.IsNullOrWhiteSpace(value))
             {
-                throw new ArgumentException("临时文件名前缀不能为空白字符串。", nameof(value));
+                throw new ArgumentException(Text.Localize("临时文件名前缀不能为空白字符串。"), nameof(value));
             }
             lock (_syncLock)
             {
@@ -436,7 +436,7 @@ public static class AppConfig
     /// </summary>
     /// <value>
     /// ConfidenceRange 结构体，定义低、中、高置信度的分界阈值。
-    /// 默认下界为 0.3，上界为 0.7。
+    /// 默认下界为 0.7，上界为 0.95。
     /// 设置时立即持久化到本地存储。
     /// </value>
     /// <exception cref="ArgumentOutOfRangeException">当设置的范围边界超出 [0.0, 1.0] 时抛出。</exception>
@@ -495,13 +495,13 @@ public static class AppConfig
         ArgumentNullException.ThrowIfNull(language);
         if (string.IsNullOrWhiteSpace(language))
         {
-            throw new ArgumentException("语言标识符不能为空白字符串。", nameof(language));
+            throw new ArgumentException(Text.Localize("语言标识符不能为空白字符串。"), nameof(language));
         }
 
         string normalizedLanguage = language.ToLowerInvariant();
         if (!SupportedLanguages.Contains(normalizedLanguage))
         {
-            throw new ArgumentException($"不支持的语言标识符: {language}。", nameof(language));
+            throw new ArgumentException(Text.Localize("不支持的语言标识符: {0}。", language), nameof(language));
         }
 
         lock (_syncLock)
@@ -534,17 +534,17 @@ public static class AppConfig
         ArgumentNullException.ThrowIfNull(command);
         if (string.IsNullOrWhiteSpace(language))
         {
-            throw new ArgumentException("语言标识符不能为空白字符串。", nameof(language));
+            throw new ArgumentException(Text.Localize("语言标识符不能为空白字符串。"), nameof(language));
         }
         if (string.IsNullOrWhiteSpace(command))
         {
-            throw new ArgumentException("执行指令不能为空白字符串。", nameof(command));
+            throw new ArgumentException(Text.Localize("执行指令不能为空白字符串。"), nameof(command));
         }
 
         string normalizedLanguage = language.ToLowerInvariant();
         if (!SupportedLanguages.Contains(normalizedLanguage))
         {
-            throw new ArgumentException($"不支持的语言标识符: {language}。", nameof(language));
+            throw new ArgumentException(Text.Localize("不支持的语言标识符: {0}。", language), nameof(language));
         }
 
         lock (_syncLock)
@@ -593,13 +593,13 @@ public static class AppConfig
         ArgumentNullException.ThrowIfNull(language);
         if (string.IsNullOrWhiteSpace(language))
         {
-            throw new ArgumentException("语言标识符不能为空白字符串。", nameof(language));
+            throw new ArgumentException(Text.Localize("语言标识符不能为空白字符串。"), nameof(language));
         }
 
         string normalizedLanguage = language.ToLowerInvariant();
         if (!SupportedLanguages.Contains(normalizedLanguage))
         {
-            throw new ArgumentException($"不支持的语言标识符: {language}。", nameof(language));
+            throw new ArgumentException(Text.Localize("不支持的语言标识符: {0}。", language), nameof(language));
         }
 
         lock (_syncLock)
@@ -624,6 +624,58 @@ public static class AppConfig
             _languageCommandsLoaded = true;
             PersistLanguageCommands();
         }
+    }
+
+    #endregion
+
+    #region 本地化辅助方法
+
+    /// <summary>
+    /// 获取主题风格枚举值的本地化显示名称。
+    /// </summary>
+    /// <param name="theme">主题风格枚举值。</param>
+    /// <returns>本地化后的显示名称字符串。</returns>
+    public static string GetThemeDisplayName(ThemeStyle theme)
+    {
+        return theme switch
+        {
+            ThemeStyle.FollowSystem => Text.Localize("跟随系统"),
+            ThemeStyle.Light => Text.Localize("浅色"),
+            ThemeStyle.Dark => Text.Localize("深色"),
+            _ => theme.ToString()
+        };
+    }
+
+    /// <summary>
+    /// 获取显示语言枚举值的本地化显示名称。
+    /// </summary>
+    /// <param name="language">显示语言枚举值。</param>
+    /// <returns>本地化后的显示名称字符串。</returns>
+    public static string GetLanguageDisplayName(DisplayLanguage language)
+    {
+        return language switch
+        {
+            DisplayLanguage.FollowSystem => Text.Localize("跟随系统"),
+            DisplayLanguage.Chinese => Text.Localize("简体中文"),
+            DisplayLanguage.English => Text.Localize("英文"),
+            _ => language.ToString()
+        };
+    }
+
+    /// <summary>
+    /// 获取语言选择器模式枚举值的本地化显示名称。
+    /// </summary>
+    /// <param name="mode">语言选择器模式枚举值。</param>
+    /// <returns>本地化后的显示名称字符串。</returns>
+    public static string GetSelectorModeDisplayName(LanguageSelectorMode mode)
+    {
+        return mode switch
+        {
+            LanguageSelectorMode.AlwaysShow => Text.Localize("始终显示"),
+            LanguageSelectorMode.HideWhenHighConfidence => Text.Localize("高可信时隐藏"),
+            LanguageSelectorMode.ShowOnlyWhenNoConfidence => Text.Localize("仅无可信时显示"),
+            _ => mode.ToString()
+        };
     }
 
     #endregion
@@ -751,11 +803,16 @@ public static class AppConfig
         return language switch
         {
             "bat" => "cmd /c",
-            "powershell" => "pwsh -ExecutionPolicy Bypass -File",
+            "powershell" => "powershell -ExecutionPolicy Bypass -File",
+            "pwsh" => "pwsh -ExecutionPolicy Bypass -File",
             "python" => "python",
             "lua" => "lua",
             "nim" => "nim r",
+            "php" => "php",
+            "javascript" => "node",
+            "typescript" => "npx ts-node",
             "go" => "go run",
+            "vbscript" => "cscript //nologo",
             _ => language
         };
     }
