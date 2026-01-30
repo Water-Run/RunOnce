@@ -4,7 +4,7 @@
  * 
  * @author: WaterRun
  * @file: Static/Config.cs
- * @date: 2026-01-28
+ * @date: 2026-01-30
  */
 
 #nullable enable
@@ -60,6 +60,18 @@ public enum LanguageSelectorMode
 
     /// <summary>仅当无法识别任何可信语言时显示。</summary>
     ShowOnlyWhenNoConfidence,
+}
+
+/// <summary>
+/// 终端类型枚举，定义执行脚本时使用的终端程序。
+/// </summary>
+public enum TerminalType
+{
+    /// <summary>Windows Terminal（wt.exe），现代终端体验。</summary>
+    WindowsTerminal,
+
+    /// <summary>传统命令提示符（cmd.exe）。</summary>
+    Cmd,
 }
 
 /// <summary>
@@ -233,6 +245,14 @@ public static class Config
     /// <value>暂未发布，当前为空字符串。</value>
     public const string MicrosoftStoreUrl = "";
 
+    /// <summary>Windows Terminal 可执行文件名。</summary>
+    /// <value>固定值 "wt.exe"。</value>
+    public const string WindowsTerminalExecutable = "wt.exe";
+
+    /// <summary>命令提示符可执行文件名。</summary>
+    /// <value>固定值 "cmd.exe"。</value>
+    public const string CmdExecutable = "cmd.exe";
+
     /// <summary>支持的脚本语言列表。</summary>
     /// <value>包含所有可配置执行指令的语言标识符，只读数组。</value>
     public static IReadOnlyList<string> SupportedLanguages { get; } =
@@ -277,6 +297,12 @@ public static class Config
 
     /// <summary>置信度范围上界设置项的存储键名。</summary>
     private const string KeyConfidenceUpperBound = "ConfidenceUpperBound";
+
+    /// <summary>执行后自动退出开关设置项的存储键名。</summary>
+    private const string KeyAutoExitAfterExecution = "AutoExitAfterExecution";
+
+    /// <summary>终端类型设置项的存储键名。</summary>
+    private const string KeyTerminalType = "TerminalType";
 
     #endregion
 
@@ -430,6 +456,73 @@ public static class Config
             }
         }
     }
+
+    /// <summary>
+    /// 获取或设置执行代码后是否自动退出应用程序。
+    /// </summary>
+    /// <value>
+    /// 布尔值，true 表示执行后自动退出，false 表示保持运行。默认为 true（开启）。
+    /// 设置时立即持久化到本地存储。
+    /// </value>
+    public static bool AutoExitAfterExecution
+    {
+        get
+        {
+            lock (_syncLock)
+            {
+                return !_localSettings.Values.TryGetValue(KeyAutoExitAfterExecution, out object? value)
+                       || value is not bool boolValue
+                       || boolValue;
+            }
+        }
+        set
+        {
+            lock (_syncLock)
+            {
+                _localSettings.Values[KeyAutoExitAfterExecution] = value;
+            }
+        }
+    }
+
+    /// <summary>
+    /// 获取或设置执行脚本时使用的终端类型。
+    /// </summary>
+    /// <value>
+    /// TerminalType 枚举值，默认为 WindowsTerminal（wt.exe）。
+    /// 设置时立即持久化到本地存储。
+    /// </value>
+    public static TerminalType Terminal
+    {
+        get
+        {
+            lock (_syncLock)
+            {
+                return _localSettings.Values.TryGetValue(KeyTerminalType, out object? value) && value is int intValue
+                    ? (TerminalType)intValue
+                    : TerminalType.WindowsTerminal;
+            }
+        }
+        set
+        {
+            lock (_syncLock)
+            {
+                _localSettings.Values[KeyTerminalType] = (int)value;
+            }
+        }
+    }
+
+    /// <summary>
+    /// 获取当前配置的终端可执行文件名。
+    /// </summary>
+    /// <value>
+    /// 根据 Terminal 设置返回对应的可执行文件名：wt.exe 或 cmd.exe。
+    /// </value>
+    public static string TerminalExecutable => Terminal switch
+    {
+        TerminalType.WindowsTerminal => WindowsTerminalExecutable,
+        TerminalType.Cmd => CmdExecutable,
+        _ => WindowsTerminalExecutable
+    };
 
     /// <summary>
     /// 获取或设置语言识别的置信度判定范围。
@@ -678,6 +771,21 @@ public static class Config
         };
     }
 
+    /// <summary>
+    /// 获取终端类型枚举值的本地化显示名称。
+    /// </summary>
+    /// <param name="terminal">终端类型枚举值。</param>
+    /// <returns>本地化后的显示名称字符串。</returns>
+    public static string GetTerminalDisplayName(TerminalType terminal)
+    {
+        return terminal switch
+        {
+            TerminalType.WindowsTerminal => Text.Localize("Windows Terminal"),
+            TerminalType.Cmd => Text.Localize("命令提示符"),
+            _ => terminal.ToString()
+        };
+    }
+
     #endregion
 
     #region 重置方法
@@ -686,7 +794,8 @@ public static class Config
     /// 将所有用户设置项重置为默认值。
     /// </summary>
     /// <remarks>
-    /// 包括主题风格、显示语言、临时文件前缀、语言选择框模式、执行确认开关、置信度范围以及所有语言执行指令。
+    /// 包括主题风格、显示语言、临时文件前缀、语言选择框模式、执行确认开关、
+    /// 置信度范围、执行后自动退出、终端类型以及所有语言执行指令。
     /// 重置后立即持久化到本地存储。
     /// </remarks>
     public static void ResetAllSettings()
@@ -700,6 +809,8 @@ public static class Config
             _localSettings.Values[KeyConfirmBeforeExecution] = false;
             _localSettings.Values[KeyConfidenceLowerBound] = ConfidenceRange.DefaultLowerBound;
             _localSettings.Values[KeyConfidenceUpperBound] = ConfidenceRange.DefaultUpperBound;
+            _localSettings.Values[KeyAutoExitAfterExecution] = true;
+            _localSettings.Values[KeyTerminalType] = (int)TerminalType.WindowsTerminal;
             _languageCommands = CreateDefaultLanguageCommands();
             _languageCommandsLoaded = true;
             PersistLanguageCommands();

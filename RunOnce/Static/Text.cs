@@ -4,7 +4,7 @@
  * 
  * @author: WaterRun
  * @file: Static/Text.cs
- * @date: 2026-01-28
+ * @date: 2026-01-30
  */
 
 #nullable enable
@@ -149,6 +149,30 @@ public static class Text
         ["选择要执行的脚本语言"] = "Select the script language to execute",
         ["输入或粘贴代码"] = "Enter or paste code",
         ["点击执行脚本"] = "Click to execute script",
+
+        // 参数验证错误消息
+        ["下界必须在 [0.0, 1.0] 范围内。"] = "Lower bound must be within [0.0, 1.0] range.",
+        ["上界必须在 [0.0, 1.0] 范围内。"] = "Upper bound must be within [0.0, 1.0] range.",
+        ["下界不能大于上界。"] = "Lower bound cannot be greater than upper bound.",
+        ["临时文件名前缀不能为空白字符串。"] = "Temp file prefix cannot be empty or whitespace.",
+        ["语言标识符不能为空白字符串。"] = "Language identifier cannot be empty or whitespace.",
+        ["不支持的语言标识符: {0}。"] = "Unsupported language identifier: {0}.",
+        ["执行指令不能为空白字符串。"] = "Execution command cannot be empty or whitespace.",
+        ["代码内容不能为空。"] = "Code content cannot be empty.",
+        ["工作目录不能为空白字符串。"] = "Working directory cannot be empty or whitespace.",
+        ["工作目录不存在: {0}。"] = "Working directory does not exist: {0}.",
+        ["无法创建临时文件: {0}。"] = "Failed to create temporary file: {0}.",
+        ["无法启动终端进程。"] = "Failed to start terminal process.",
+
+        // 终端类型显示名称
+        ["Windows Terminal"] = "Windows Terminal",
+        ["命令提示符"] = "Command Prompt",
+
+        // 执行模块相关
+        ["执行后自动退出"] = "Auto Exit After Execution",
+        ["终端类型"] = "Terminal Type",
+        ["脚本执行"] = "Script Execution",
+        ["按任意键继续..."] = "Press any key to continue...",
     };
 
     /// <summary>
