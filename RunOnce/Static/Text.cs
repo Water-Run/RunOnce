@@ -4,7 +4,7 @@
  * 
  * @author: WaterRun
  * @file: Static/Text.cs
- * @date: 2026-01-30
+ * @date: 2026-02-03
  */
 
 #nullable enable
@@ -35,144 +35,18 @@ public static class Text
         ["版本"] = "Version",
         ["作者"] = "Author",
 
-        // 主题风格
+        // 主题风格（Config.cs 使用）
         ["跟随系统"] = "Follow System",
         ["浅色"] = "Light",
         ["深色"] = "Dark",
-        ["主题风格"] = "Theme Style",
 
-        // 显示语言
-        ["显示语言"] = "Display Language",
+        // 显示语言（Config.cs 使用）
         ["简体中文"] = "Simplified Chinese",
         ["英文"] = "English",
 
-        // 语言选择器模式
-        ["始终显示"] = "Always Show",
-        ["高可信时隐藏"] = "Hide When High Confidence",
-        ["仅无可信时显示"] = "Show Only When No Confidence",
-        ["执行前语言选择框"] = "Language Selector Before Execution",
-
-        // 执行相关
-        ["执行"] = "Execute",
-        ["执行前确认"] = "Confirm Before Execution",
-        ["确认执行"] = "Confirm Execution",
-        ["取消"] = "Cancel",
-        ["确定"] = "OK",
-        ["运行"] = "Run",
-        ["停止"] = "Stop",
-
-        // 语言识别
-        ["最可能"] = "Most Likely",
-        ["次可能"] = "Less Likely",
-        ["手动指定"] = "Manual Selection",
-        ["语言识别"] = "Language Detection",
-        ["置信度"] = "Confidence",
-        ["高置信度"] = "High Confidence",
-        ["中置信度"] = "Medium Confidence",
-        ["低置信度"] = "Low Confidence",
-
-        // 设置
-        ["设置"] = "Settings",
-        ["常规设置"] = "General Settings",
-        ["语言指令配置"] = "Language Command Configuration",
-        ["临时文件名前缀"] = "Temp File Prefix",
-        ["置信度范围"] = "Confidence Range",
-        ["下界"] = "Lower Bound",
-        ["上界"] = "Upper Bound",
-        ["重置"] = "Reset",
-        ["重置全部"] = "Reset All",
-        ["恢复默认"] = "Restore Defaults",
-        ["保存"] = "Save",
-        ["应用"] = "Apply",
-
-        // 编辑器
+        // 页面标题
         ["编辑器"] = "Editor",
-        ["新建"] = "New",
-        ["打开"] = "Open",
-        ["保存文件"] = "Save File",
-        ["复制"] = "Copy",
-        ["粘贴"] = "Paste",
-        ["剪切"] = "Cut",
-        ["撤销"] = "Undo",
-        ["重做"] = "Redo",
-        ["全选"] = "Select All",
-        ["清空"] = "Clear",
-        ["在此运行代码"] = "Run Code Here",
-
-        // 脚本语言名称
-        ["批处理"] = "Batch",
-
-        // 文件操作
-        ["临时文件"] = "Temporary File",
-        ["文件已创建"] = "File Created",
-        ["文件已删除"] = "File Deleted",
-        ["执行完成"] = "Execution Completed",
-        ["执行失败"] = "Execution Failed",
-
-        // 错误与警告
-        ["错误"] = "Error",
-        ["警告"] = "Warning",
-        ["信息"] = "Information",
-        ["未知错误"] = "Unknown Error",
-        ["操作失败"] = "Operation Failed",
-        ["参数无效"] = "Invalid Parameter",
-        ["文件不存在"] = "File Not Found",
-        ["权限不足"] = "Insufficient Permissions",
-        ["语言不支持"] = "Language Not Supported",
-        ["指令未配置"] = "Command Not Configured",
-
-        // 确认对话框
-        ["确认"] = "Confirm",
-        ["是否确认执行此脚本？"] = "Are you sure you want to execute this script?",
-        ["此操作不可撤销"] = "This action cannot be undone",
-        ["是否重置所有设置？"] = "Reset all settings?",
-
-        // 状态信息
-        ["就绪"] = "Ready",
-        ["正在执行..."] = "Executing...",
-        ["正在识别语言..."] = "Detecting language...",
-        ["已复制到剪贴板"] = "Copied to clipboard",
-
-        // 关于
-        ["关于"] = "About",
-        ["开源许可"] = "Open Source License",
-        ["GitHub 仓库"] = "GitHub Repository",
-        ["微软商店"] = "Microsoft Store",
-        ["检查更新"] = "Check for Updates",
-        ["反馈问题"] = "Report Issue",
-
-        // 右键菜单
-        ["在此处运行脚本"] = "Run Script Here",
-        ["使用一次运行打开"] = "Open with RunOnce",
-
-        // 工具提示
-        ["选择要执行的脚本语言"] = "Select the script language to execute",
-        ["输入或粘贴代码"] = "Enter or paste code",
-        ["点击执行脚本"] = "Click to execute script",
-
-        // 参数验证错误消息
-        ["下界必须在 [0.0, 1.0] 范围内。"] = "Lower bound must be within [0.0, 1.0] range.",
-        ["上界必须在 [0.0, 1.0] 范围内。"] = "Upper bound must be within [0.0, 1.0] range.",
-        ["下界不能大于上界。"] = "Lower bound cannot be greater than upper bound.",
-        ["临时文件名前缀不能为空白字符串。"] = "Temp file prefix cannot be empty or whitespace.",
-        ["语言标识符不能为空白字符串。"] = "Language identifier cannot be empty or whitespace.",
-        ["不支持的语言标识符: {0}。"] = "Unsupported language identifier: {0}.",
-        ["执行指令不能为空白字符串。"] = "Execution command cannot be empty or whitespace.",
-        ["代码内容不能为空。"] = "Code content cannot be empty.",
-        ["工作目录不能为空白字符串。"] = "Working directory cannot be empty or whitespace.",
-        ["工作目录不存在: {0}。"] = "Working directory does not exist: {0}.",
-        ["无法创建临时文件: {0}。"] = "Failed to create temporary file: {0}.",
-        ["无法启动终端进程。"] = "Failed to start terminal process.",
-
-        // 终端类型显示名称
-        ["Windows Terminal"] = "Windows Terminal",
-        ["命令提示符"] = "Command Prompt",
-
-        // 执行模块相关
-        ["执行后自动退出"] = "Auto Exit After Execution",
-        ["终端类型"] = "Terminal Type",
-        ["脚本执行"] = "Script Execution",
-        ["按任意键继续..."] = "Press any key to continue...",
+        ["设置"] = "Settings",
     };
 
     /// <summary>
@@ -185,7 +59,7 @@ public static class Text
     /// </returns>
     /// <exception cref="ArgumentNullException">当 chinese 为 null 时抛出。</exception>
     /// <remarks>
-    /// 语言解析优先级：用户显式设置 > 系统语言检测。
+    /// 语言解析优先级：用户显式设置 &gt; 系统语言检测。
     /// 当设置为 FollowSystem 时，通过 CultureInfo.CurrentUICulture 判断是否为中文环境。
     /// </remarks>
     public static string Localize(string chinese)

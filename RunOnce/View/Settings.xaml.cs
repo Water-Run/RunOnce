@@ -1,31 +1,35 @@
-using Microsoft.UI.Xaml;
+/*
+ * 设置页面
+ * Demo 占位页面，实际功能将在后续版本实现
+ * 
+ * @author: WaterRun
+ * @file: View/Settings.xaml.cs
+ * @date: 2026-02-03
+ */
+
+#nullable enable
+
 using Microsoft.UI.Xaml.Controls;
-using Microsoft.UI.Xaml.Controls.Primitives;
-using Microsoft.UI.Xaml.Data;
-using Microsoft.UI.Xaml.Input;
-using Microsoft.UI.Xaml.Media;
-using Microsoft.UI.Xaml.Navigation;
-using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
-using System.Runtime.InteropServices.WindowsRuntime;
-using Windows.Foundation;
-using Windows.Foundation.Collections;
+using RunOnce.Static;
 
-// To learn more about WinUI, the WinUI project structure,
-// and more about our project templates, see: http://aka.ms/winui-project-info.
+namespace RunOnce.View;
 
-namespace RunOnce.View
+/// <summary>
+/// 设置页面，当前为 Demo 占位页面。
+/// </summary>
+/// <remarks>
+/// 不变量：页面加载后标题文本已完成本地化初始化。
+/// 线程安全：所有成员必须在 UI 线程访问。
+/// 副作用：无。
+/// </remarks>
+public sealed partial class Settings : Page
 {
     /// <summary>
-    /// An empty page that can be used on its own or navigated to within a Frame.
+    /// 初始化设置页面实例。
     /// </summary>
-    public sealed partial class Settings : Page
+    public Settings()
     {
-        public Settings()
-        {
-            InitializeComponent();
-        }
+        InitializeComponent();
+        PageTitleText.Text = Text.Localize("设置");
     }
 }

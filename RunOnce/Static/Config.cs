@@ -4,7 +4,7 @@
  * 
  * @author: WaterRun
  * @file: Static/Config.cs
- * @date: 2026-01-30
+ * @date: 2026-02-03
  */
 
 #nullable enable
@@ -866,7 +866,6 @@ public static class Config
             }
             catch (JsonException)
             {
-                // 数据损坏时静默回退到默认值，符合配置类的容错设计
             }
         }
 
