@@ -4,7 +4,7 @@
  * 
  * @author: WaterRun
  * @file: Static/Config.cs
- * @date: 2026-02-03
+ * @date: 2026-02-04
  */
 
 #nullable enable
@@ -259,15 +259,10 @@ public static class Config
     [
         "bat",
         "powershell",
-        "pwsh",
         "python",
         "lua",
         "nim",
-        "php",
-        "javascript",
-        "typescript",
         "go",
-        "vbscript"
     ];
 
     #endregion
@@ -914,15 +909,10 @@ public static class Config
         {
             "bat" => "cmd /c",
             "powershell" => "powershell -ExecutionPolicy Bypass -File",
-            "pwsh" => "pwsh -ExecutionPolicy Bypass -File",
             "python" => "python",
             "lua" => "lua",
             "nim" => "nim r",
-            "php" => "php",
-            "javascript" => "node",
-            "typescript" => "npx ts-node",
             "go" => "go run",
-            "vbscript" => "cscript //nologo",
             _ => language
         };
     }
