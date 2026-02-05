@@ -6,12 +6,281 @@
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     mc:Ignorable="d"
-    Background="Transparent">
+    NavigationCacheMode="Disabled">
 
-    <Grid Padding="24">
-        <TextBlock 
-            x:Name="PageTitleText"
-            Style="{ThemeResource TitleTextBlockStyle}"
-            VerticalAlignment="Top"/>
+    <Grid Padding="24,16,24,24">
+        <ScrollViewer VerticalScrollBarVisibility="Auto">
+            <StackPanel Spacing="8" MaxWidth="800">
+
+                <!-- 基本 -->
+                <TextBlock 
+                    x:Name="BasicSectionHeader"
+                    Style="{ThemeResource BodyStrongTextBlockStyle}"
+                    Margin="0,0,0,4"/>
+
+                <Grid 
+                    Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                    BorderThickness="1"
+                    CornerRadius="8"
+                    Padding="16">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+
+                    <!-- 外观 -->
+                    <Grid Grid.Row="0" Padding="0,8">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                            <TextBlock x:Name="ThemeLabel" Style="{ThemeResource BodyTextBlockStyle}"/>
+                            <TextBlock x:Name="ThemeDescription" Style="{ThemeResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+                        </StackPanel>
+                        <ComboBox 
+                            x:Name="ThemeComboBox"
+                            Grid.Column="1"
+                            MinWidth="160"
+                            SelectionChanged="ThemeComboBox_SelectionChanged"/>
+                    </Grid>
+
+                    <Rectangle Grid.Row="0" Height="1" Fill="{ThemeResource DividerStrokeColorDefaultBrush}" VerticalAlignment="Bottom"/>
+
+                    <!-- 语言 -->
+                    <Grid Grid.Row="1" Padding="0,8">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                            <TextBlock x:Name="LanguageLabel" Style="{ThemeResource BodyTextBlockStyle}"/>
+                            <TextBlock x:Name="LanguageDescription" Style="{ThemeResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+                        </StackPanel>
+                        <ComboBox 
+                            x:Name="LanguageComboBox"
+                            Grid.Column="1"
+                            MinWidth="160"
+                            SelectionChanged="LanguageComboBox_SelectionChanged"/>
+                    </Grid>
+                </Grid>
+
+                <!-- 代码执行 -->
+                <TextBlock 
+                    x:Name="ExecutionSectionHeader"
+                    Style="{ThemeResource BodyStrongTextBlockStyle}"
+                    Margin="0,16,0,4"/>
+
+                <Grid 
+                    Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                    BorderThickness="1"
+                    CornerRadius="8"
+                    Padding="16">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+
+                    <!-- 执行前确认 -->
+                    <Grid Grid.Row="0" Padding="0,8">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                            <TextBlock x:Name="ConfirmLabel" Style="{ThemeResource BodyTextBlockStyle}"/>
+                            <TextBlock x:Name="ConfirmDescription" Style="{ThemeResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+                        </StackPanel>
+                        <ToggleSwitch 
+                            x:Name="ConfirmToggle"
+                            Grid.Column="1"
+                            Toggled="ConfirmToggle_Toggled"/>
+                    </Grid>
+
+                    <Rectangle Grid.Row="0" Height="1" Fill="{ThemeResource DividerStrokeColorDefaultBrush}" VerticalAlignment="Bottom"/>
+
+                    <!-- 执行前语言选择框 -->
+                    <Grid Grid.Row="1" Padding="0,8">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                            <TextBlock x:Name="SelectorModeLabel" Style="{ThemeResource BodyTextBlockStyle}"/>
+                            <TextBlock x:Name="SelectorModeDescription" Style="{ThemeResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+                        </StackPanel>
+                        <ComboBox 
+                            x:Name="SelectorModeComboBox"
+                            Grid.Column="1"
+                            MinWidth="160"
+                            SelectionChanged="SelectorModeComboBox_SelectionChanged"/>
+                    </Grid>
+
+                    <Rectangle Grid.Row="1" Height="1" Fill="{ThemeResource DividerStrokeColorDefaultBrush}" VerticalAlignment="Bottom"/>
+
+                    <!-- 执行后自动退出 -->
+                    <Grid Grid.Row="2" Padding="0,8">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                            <TextBlock x:Name="AutoExitLabel" Style="{ThemeResource BodyTextBlockStyle}"/>
+                            <TextBlock x:Name="AutoExitDescription" Style="{ThemeResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+                        </StackPanel>
+                        <ToggleSwitch 
+                            x:Name="AutoExitToggle"
+                            Grid.Column="1"
+                            Toggled="AutoExitToggle_Toggled"/>
+                    </Grid>
+
+                    <Rectangle Grid.Row="2" Height="1" Fill="{ThemeResource DividerStrokeColorDefaultBrush}" VerticalAlignment="Bottom"/>
+
+                    <!-- 终端类型 -->
+                    <Grid Grid.Row="3" Padding="0,8">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                            <TextBlock x:Name="TerminalLabel" Style="{ThemeResource BodyTextBlockStyle}"/>
+                            <TextBlock x:Name="TerminalDescription" Style="{ThemeResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+                        </StackPanel>
+                        <ComboBox 
+                            x:Name="TerminalComboBox"
+                            Grid.Column="1"
+                            MinWidth="160"
+                            SelectionChanged="TerminalComboBox_SelectionChanged"/>
+                    </Grid>
+
+                    <Rectangle Grid.Row="3" Height="1" Fill="{ThemeResource DividerStrokeColorDefaultBrush}" VerticalAlignment="Bottom"/>
+
+                    <!-- 高级设置 -->
+                    <Grid Grid.Row="4" Padding="0,8,0,0">
+                        <HyperlinkButton 
+                            x:Name="AdvancedSettingsLink"
+                            Padding="0"
+                            Click="AdvancedSettingsLink_Click"/>
+                    </Grid>
+                </Grid>
+
+                <!-- 此程序 -->
+                <TextBlock 
+                    x:Name="AboutSectionHeader"
+                    Style="{ThemeResource BodyStrongTextBlockStyle}"
+                    Margin="0,16,0,4"/>
+
+                <Grid 
+                    Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                    BorderThickness="1"
+                    CornerRadius="8"
+                    Padding="16">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+
+                    <!-- 软件名 -->
+                    <Grid Grid.Row="0" Padding="0,8">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock x:Name="AppNameLabel" Grid.Column="0" Style="{ThemeResource BodyTextBlockStyle}" VerticalAlignment="Center"/>
+                        <TextBlock x:Name="AppNameValue" Grid.Column="1" Style="{ThemeResource BodyTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" VerticalAlignment="Center"/>
+                    </Grid>
+
+                    <Rectangle Grid.Row="0" Height="1" Fill="{ThemeResource DividerStrokeColorDefaultBrush}" VerticalAlignment="Bottom"/>
+
+                    <!-- 版本 -->
+                    <Grid Grid.Row="1" Padding="0,8">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock x:Name="VersionLabel" Grid.Column="0" Style="{ThemeResource BodyTextBlockStyle}" VerticalAlignment="Center"/>
+                        <TextBlock x:Name="VersionValue" Grid.Column="1" Style="{ThemeResource BodyTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" VerticalAlignment="Center"/>
+                    </Grid>
+
+                    <Rectangle Grid.Row="1" Height="1" Fill="{ThemeResource DividerStrokeColorDefaultBrush}" VerticalAlignment="Bottom"/>
+
+                    <!-- 编译于 -->
+                    <Grid Grid.Row="2" Padding="0,8">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock x:Name="BuildTimeLabel" Grid.Column="0" Style="{ThemeResource BodyTextBlockStyle}" VerticalAlignment="Center"/>
+                        <TextBlock x:Name="BuildTimeValue" Grid.Column="1" Style="{ThemeResource BodyTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" VerticalAlignment="Center"/>
+                    </Grid>
+
+                    <Rectangle Grid.Row="2" Height="1" Fill="{ThemeResource DividerStrokeColorDefaultBrush}" VerticalAlignment="Bottom"/>
+
+                    <!-- 作者 -->
+                    <Grid Grid.Row="3" Padding="0,8">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock x:Name="AuthorLabel" Grid.Column="0" Style="{ThemeResource BodyTextBlockStyle}" VerticalAlignment="Center"/>
+                        <TextBlock x:Name="AuthorValue" Grid.Column="1" Style="{ThemeResource BodyTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" VerticalAlignment="Center"/>
+                    </Grid>
+
+                    <Rectangle Grid.Row="3" Height="1" Fill="{ThemeResource DividerStrokeColorDefaultBrush}" VerticalAlignment="Bottom"/>
+
+                    <!-- GitHub -->
+                    <Grid Grid.Row="4" Padding="0,8">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="GitHub" Grid.Column="0" Style="{ThemeResource BodyTextBlockStyle}" VerticalAlignment="Center"/>
+                        <HyperlinkButton 
+                            x:Name="GitHubLink"
+                            Grid.Column="1"
+                            Padding="0"
+                            Click="GitHubLink_Click"/>
+                    </Grid>
+
+                    <Rectangle Grid.Row="4" Height="1" Fill="{ThemeResource DividerStrokeColorDefaultBrush}" VerticalAlignment="Bottom"/>
+
+                    <!-- 微软商店 -->
+                    <Grid x:Name="StoreRow" Grid.Row="5" Padding="0,8">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock x:Name="StoreLabel" Grid.Column="0" Style="{ThemeResource BodyTextBlockStyle}" VerticalAlignment="Center"/>
+                        <HyperlinkButton 
+                            x:Name="StoreLink"
+                            Grid.Column="1"
+                            Padding="0"
+                            Click="StoreLink_Click"/>
+                    </Grid>
+
+                    <Rectangle x:Name="StoreDivider" Grid.Row="5" Height="1" Fill="{ThemeResource DividerStrokeColorDefaultBrush}" VerticalAlignment="Bottom"/>
+
+                    <!-- 重置所有设置 -->
+                    <Grid Grid.Row="6" Padding="0,8,0,0">
+                        <HyperlinkButton 
+                            x:Name="ResetAllLink"
+                            Padding="0"
+                            Click="ResetAllLink_Click"/>
+                    </Grid>
+                </Grid>
+
+            </StackPanel>
+        </ScrollViewer>
     </Grid>
 </Page>

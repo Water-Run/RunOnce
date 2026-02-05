@@ -4,7 +4,7 @@
  * 
  * @author: WaterRun
  * @file: Static/Text.cs
- * @date: 2026-02-03
+ * @date: 2026-02-05
  */
 
 #nullable enable
@@ -35,18 +35,89 @@ public static class Text
         ["版本"] = "Version",
         ["作者"] = "Author",
 
-        // 主题风格（Config.cs 使用）
+        // 主题风格
         ["跟随系统"] = "Follow System",
         ["浅色"] = "Light",
         ["深色"] = "Dark",
 
-        // 显示语言（Config.cs 使用）
+        // 显示语言
         ["简体中文"] = "Simplified Chinese",
         ["英文"] = "English",
+
+        // 语言选择器模式
+        ["始终显示"] = "Always Show",
+        ["高可信时隐藏"] = "Hide When High Confidence",
+        ["仅无可信时显示"] = "Show Only When No Confidence",
+
+        // 终端类型
+        ["Windows Terminal"] = "Windows Terminal",
+        ["命令提示符"] = "Command Prompt",
 
         // 页面标题
         ["编辑器"] = "Editor",
         ["设置"] = "Settings",
+
+        // 设置页面 - 分组标题
+        ["基本"] = "General",
+        ["代码执行"] = "Code Execution",
+        ["此程序"] = "About",
+
+        // 设置页面 - 基本设置
+        ["外观"] = "Appearance",
+        ["选择应用程序的主题风格"] = "Choose the application theme style",
+        ["语言"] = "Language",
+        ["选择应用程序的显示语言"] = "Choose the application display language",
+
+        // 设置页面 - 代码执行设置
+        ["执行前确认"] = "Confirm Before Execution",
+        ["执行代码前显示确认对话框"] = "Show confirmation dialog before executing code",
+        ["执行前语言选择框"] = "Language Selector Before Execution",
+        ["控制语言选择框的显示时机"] = "Control when the language selector is displayed",
+        ["执行后自动退出"] = "Auto Exit After Execution",
+        ["代码执行后自动关闭应用程序"] = "Automatically close the application after code execution",
+        ["终端类型"] = "Terminal Type",
+        ["选择执行代码使用的终端程序"] = "Choose the terminal program for code execution",
+        ["高级设置"] = "Advanced Settings",
+
+        // 设置页面 - 关于
+        ["软件名"] = "App Name",
+        ["编译于"] = "Built On",
+        ["微软商店"] = "Microsoft Store",
+        ["访问"] = "Visit",
+        ["重置所有设置"] = "Reset All Settings",
+
+        // 高级设置对话框
+        ["临时文件名前缀"] = "Temporary File Prefix",
+        ["置信度范围"] = "Confidence Range",
+        ["下界"] = "Lower Bound",
+        ["上界"] = "Upper Bound",
+        ["语言执行命令"] = "Language Execution Commands",
+        ["重置为默认"] = "Reset to Default",
+        ["保存"] = "Save",
+        ["取消"] = "Cancel",
+
+        // 重置确认对话框
+        ["确定要将所有设置重置为默认值吗？此操作无法撤销。"] = "Are you sure you want to reset all settings to default? This action cannot be undone.",
+        ["重置"] = "Reset",
+
+        // Config.cs 中的错误消息
+        ["下界必须在 [0.0, 1.0] 范围内。"] = "Lower bound must be in the range [0.0, 1.0].",
+        ["上界必须在 [0.0, 1.0] 范围内。"] = "Upper bound must be in the range [0.0, 1.0].",
+        ["下界不能大于上界。"] = "Lower bound cannot be greater than upper bound.",
+        ["临时文件名前缀不能为空白字符串。"] = "Temporary file prefix cannot be empty or whitespace.",
+        ["语言标识符不能为空白字符串。"] = "Language identifier cannot be empty or whitespace.",
+        ["不支持的语言标识符: {0}。"] = "Unsupported language identifier: {0}.",
+        ["执行指令不能为空白字符串。"] = "Execution command cannot be empty or whitespace.",
+
+        // Detector.cs 中的错误消息
+        ["结果数量必须大于 0。"] = "Result count must be greater than 0.",
+
+        // Exec.cs 中的错误消息
+        ["代码内容不能为空。"] = "Code content cannot be empty.",
+        ["工作目录不能为空白字符串。"] = "Working directory cannot be empty or whitespace.",
+        ["工作目录不存在: {0}。"] = "Working directory does not exist: {0}.",
+        ["无法创建临时文件: {0}。"] = "Failed to create temporary file: {0}.",
+        ["无法启动终端进程。"] = "Failed to start terminal process.",
     };
 
     /// <summary>

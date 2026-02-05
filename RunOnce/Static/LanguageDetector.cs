@@ -3,8 +3,8 @@
  * 通过代码特征分析自动识别脚本语言类型，输出按置信度排序的检测结果
  * 
  * @author: WaterRun
- * @file: Static/Detector.cs
- * @date: 2026-02-04
+ * @file: Static/LanguageDetector.cs
+ * @date: 2026-02-05
  */
 
 #nullable enable
@@ -51,7 +51,7 @@ public readonly record struct DetectionResult(string Language, double Confidence
 /// 线程安全：所有公开方法为线程安全，内部状态均为只读。
 /// 副作用：无。
 /// </remarks>
-public static class Detector
+public static class LanguageDetector
 {
     /// <summary>
     /// 确定性标记命中时的置信度分数。
