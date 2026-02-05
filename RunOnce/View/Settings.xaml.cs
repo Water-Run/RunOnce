@@ -11,7 +11,10 @@
 
 using System;
 using System.Collections.Generic;
+using System.Globalization;
+using System.IO;
 using System.Linq;
+using System.Reflection;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using RunOnce.Static;
@@ -20,59 +23,71 @@ using Windows.System;
 namespace RunOnce.View;
 
 /// <summary>
-/// 设置页面类，提供应用程序所有配置项的可视化编辑界面。
+/// 设置页面，提供应用程序所有配置项的可视化编辑界面。
 /// </summary>
 /// <remarks>
-/// 不变量：页面加载后所有控件状态与 Config 保持同步；用户操作立即持久化到配置。
+/// 不变量：页面加载后所有控件状态与 <see cref="Config"/> 保持同步；用户操作立即持久化到配置。
 /// 线程安全：所有成员必须在 UI 线程访问。
-/// 副作用：控件值变更时自动更新 Config 并触发持久化。
+/// 副作用：控件值变更时自动更新 <see cref="Config"/> 并触发持久化。
 /// </remarks>
 public sealed partial class Settings : Page
 {
     /// <summary>
     /// 编译时间戳，由编译时自动生成。
     /// </summary>
-    private static readonly DateTime _buildTime = GetBuildTime();
+    /// <remarks>
+    /// 生命周期：静态只读，应用程序生命周期内不变。
+    /// </remarks>
+    private static readonly DateTime _buildTime = RetrieveBuildTime();
 
     /// <summary>
     /// 标识是否正在进行程序化更新，用于避免事件循环触发。
     /// </summary>
-    private bool _isUpdating;
+    /// <remarks>
+    /// 当为 true 时，所有控件事件处理程序应跳过配置更新逻辑。
+    /// </remarks>
+    private bool _isProgrammaticUpdate;
 
     /// <summary>
     /// 初始化设置页面实例。
     /// </summary>
     /// <remarks>
-    /// 执行顺序：初始化组件 → 加载本地化文本 → 初始化控件状态。
+    /// 执行顺序：初始化组件 → 注册加载事件。
     /// </remarks>
     public Settings()
     {
         InitializeComponent();
-        Loaded += OnPageLoaded;
+        Loaded += HandlePageLoaded;
     }
 
     /// <summary>
-    /// 页面加载完成事件处理程序。
+    /// 处理页面加载完成事件。
     /// </summary>
-    /// <param name="sender">事件源对象。</param>
+    /// <param name="sender">事件源对象，预期为当前页面实例。</param>
     /// <param name="e">路由事件参数。</param>
-    private void OnPageLoaded(object sender, RoutedEventArgs e)
+    private void HandlePageLoaded(object sender, RoutedEventArgs e)
     {
-        _isUpdating = true;
+        _isProgrammaticUpdate = true;
 
-        LoadLocalizedTexts();
-        InitializeComboBoxItems();
-        LoadCurrentSettings();
-        UpdateStoreRowVisibility();
+        ApplyLocalizedTexts();
+        PopulateComboBoxItems();
+        SynchronizeControlsWithConfig();
+        RefreshStoreRowVisibility();
+        UpdateAboutSectionCornerRadius();
 
-        _isUpdating = false;
+        _isProgrammaticUpdate = false;
     }
 
     /// <summary>
-    /// 加载所有界面元素的本地化文本。
+    /// 应用所有界面元素的本地化文本。
     /// </summary>
-    private void LoadLocalizedTexts()
+    /// <remarks>
+    /// 副作用：更新所有 TextBlock 和控件的显示文本。
+    /// </remarks>
+    private void ApplyLocalizedTexts()
     {
+        PageTitle.Text = Text.Localize("设置");
+
         BasicSectionHeader.Text = Text.Localize("基本");
         ExecutionSectionHeader.Text = Text.Localize("代码执行");
         AboutSectionHeader.Text = Text.Localize("此程序");
@@ -90,14 +105,16 @@ public sealed partial class Settings : Page
         AutoExitDescription.Text = Text.Localize("代码执行后自动关闭应用程序");
         TerminalLabel.Text = Text.Localize("终端类型");
         TerminalDescription.Text = Text.Localize("选择执行代码使用的终端程序");
-        AdvancedSettingsLink.Content = Text.Localize("高级设置");
+        AdvancedSettingsLabel.Text = Text.Localize("高级设置");
+        AdvancedSettingsDescription.Text = Text.Localize("配置临时文件、置信度阈值和语言命令");
+        AdvancedSettingsButton.Content = Text.Localize("打开");
 
         AppNameLabel.Text = Text.Localize("软件名");
         AppNameValue.Text = Config.AppName;
         VersionLabel.Text = Text.Localize("版本");
         VersionValue.Text = Config.Version;
         BuildTimeLabel.Text = Text.Localize("编译于");
-        BuildTimeValue.Text = _buildTime.ToString("yyyy-MM-dd HH:mm:ss");
+        BuildTimeValue.Text = _buildTime.ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture);
         AuthorLabel.Text = Text.Localize("作者");
         AuthorValue.Text = Config.Author;
         GitHubLink.Content = Text.Localize("访问");
@@ -107,60 +124,51 @@ public sealed partial class Settings : Page
     }
 
     /// <summary>
-    /// 初始化所有 ComboBox 控件的选项列表。
+    /// 填充所有 ComboBox 控件的选项列表。
     /// </summary>
-    private void InitializeComboBoxItems()
+    /// <remarks>
+    /// 副作用：清空并重新填充所有 ComboBox 的 Items 集合。
+    /// </remarks>
+    private void PopulateComboBoxItems()
     {
-        ThemeComboBox.Items.Clear();
-        foreach (ThemeStyle theme in Enum.GetValues<ThemeStyle>())
-        {
-            ThemeComboBox.Items.Add(new ComboBoxItem
-            {
-                Content = Config.GetThemeDisplayName(theme),
-                Tag = theme
-            });
-        }
+        PopulateSingleComboBox(ThemeComboBox, Enum.GetValues<ThemeStyle>(), Config.GetThemeDisplayName);
+        PopulateSingleComboBox(LanguageComboBox, Enum.GetValues<DisplayLanguage>(), Config.GetLanguageDisplayName);
+        PopulateSingleComboBox(SelectorModeComboBox, Enum.GetValues<LanguageSelectorMode>(), Config.GetSelectorModeDisplayName);
+        PopulateSingleComboBox(TerminalComboBox, Enum.GetValues<TerminalType>(), Config.GetTerminalDisplayName);
+    }
 
-        LanguageComboBox.Items.Clear();
-        foreach (DisplayLanguage language in Enum.GetValues<DisplayLanguage>())
+    /// <summary>
+    /// 填充单个 ComboBox 的选项。
+    /// </summary>
+    /// <typeparam name="T">枚举类型。</typeparam>
+    /// <param name="comboBox">目标 ComboBox 控件，不允许为 null。</param>
+    /// <param name="values">枚举值集合，不允许为 null。</param>
+    /// <param name="displayNameSelector">获取显示名称的委托，不允许为 null。</param>
+    private static void PopulateSingleComboBox<T>(ComboBox comboBox, IEnumerable<T> values, Func<T, string> displayNameSelector) where T : Enum
+    {
+        comboBox.Items.Clear();
+        foreach (T value in values)
         {
-            LanguageComboBox.Items.Add(new ComboBoxItem
+            comboBox.Items.Add(new ComboBoxItem
             {
-                Content = Config.GetLanguageDisplayName(language),
-                Tag = language
-            });
-        }
-
-        SelectorModeComboBox.Items.Clear();
-        foreach (LanguageSelectorMode mode in Enum.GetValues<LanguageSelectorMode>())
-        {
-            SelectorModeComboBox.Items.Add(new ComboBoxItem
-            {
-                Content = Config.GetSelectorModeDisplayName(mode),
-                Tag = mode
-            });
-        }
-
-        TerminalComboBox.Items.Clear();
-        foreach (TerminalType terminal in Enum.GetValues<TerminalType>())
-        {
-            TerminalComboBox.Items.Add(new ComboBoxItem
-            {
-                Content = Config.GetTerminalDisplayName(terminal),
-                Tag = terminal
+                Content = displayNameSelector(value),
+                Tag = value
             });
         }
     }
 
     /// <summary>
-    /// 从配置加载当前设置值到控件。
+    /// 将控件状态与当前配置同步。
     /// </summary>
-    private void LoadCurrentSettings()
+    /// <remarks>
+    /// 副作用：更新所有设置控件的选中状态和开关状态。
+    /// </remarks>
+    private void SynchronizeControlsWithConfig()
     {
-        SelectComboBoxItemByTag(ThemeComboBox, Config.Theme);
-        SelectComboBoxItemByTag(LanguageComboBox, Config.Language);
-        SelectComboBoxItemByTag(SelectorModeComboBox, Config.SelectorMode);
-        SelectComboBoxItemByTag(TerminalComboBox, Config.Terminal);
+        SelectItemByTag(ThemeComboBox, Config.Theme);
+        SelectItemByTag(LanguageComboBox, Config.Language);
+        SelectItemByTag(SelectorModeComboBox, Config.SelectorMode);
+        SelectItemByTag(TerminalComboBox, Config.Terminal);
 
         ConfirmToggle.IsOn = Config.ConfirmBeforeExecution;
         AutoExitToggle.IsOn = Config.AutoExitAfterExecution;
@@ -169,148 +177,167 @@ public sealed partial class Settings : Page
     /// <summary>
     /// 根据 Tag 值选择 ComboBox 中对应的项。
     /// </summary>
-    /// <typeparam name="T">Tag 值的类型。</typeparam>
-    /// <param name="comboBox">目标 ComboBox 控件。</param>
-    /// <param name="tagValue">要匹配的 Tag 值。</param>
-    private static void SelectComboBoxItemByTag<T>(ComboBox comboBox, T tagValue) where T : notnull
+    /// <typeparam name="T">Tag 值的类型，必须实现值相等比较。</typeparam>
+    /// <param name="comboBox">目标 ComboBox 控件，不允许为 null。</param>
+    /// <param name="targetTag">要匹配的 Tag 值。</param>
+    private static void SelectItemByTag<T>(ComboBox comboBox, T targetTag) where T : notnull
     {
-        ComboBoxItem? item = comboBox.Items
+        ComboBoxItem? matchingItem = comboBox.Items
             .OfType<ComboBoxItem>()
-            .FirstOrDefault(i => i.Tag is T tag && EqualityComparer<T>.Default.Equals(tag, tagValue));
+            .FirstOrDefault(item => item.Tag is T tag && EqualityComparer<T>.Default.Equals(tag, targetTag));
 
-        if (item is not null)
+        if (matchingItem is not null)
         {
-            comboBox.SelectedItem = item;
+            comboBox.SelectedItem = matchingItem;
         }
     }
 
     /// <summary>
-    /// 更新微软商店行的可见性。
+    /// 刷新微软商店行的可见性。
     /// </summary>
     /// <remarks>
-    /// 若商店链接为空，则隐藏该行及其分隔线。
+    /// 若商店链接为空，则隐藏该行。
     /// </remarks>
-    private void UpdateStoreRowVisibility()
+    private void RefreshStoreRowVisibility()
     {
-        bool hasStoreUrl = !string.IsNullOrEmpty(Config.MicrosoftStoreUrl);
-        StoreRow.Visibility = hasStoreUrl ? Visibility.Visible : Visibility.Collapsed;
-        StoreDivider.Visibility = hasStoreUrl ? Visibility.Visible : Visibility.Collapsed;
+        StoreRow.Visibility = string.IsNullOrEmpty(Config.MicrosoftStoreUrl)
+            ? Visibility.Collapsed
+            : Visibility.Visible;
     }
 
     /// <summary>
-    /// 主题选择变更事件处理程序。
+    /// 更新关于区域最后一个可见卡片的圆角。
+    /// </summary>
+    /// <remarks>
+    /// 根据商店行的可见性动态调整圆角，确保最后一个卡片有底部圆角。
+    /// </remarks>
+    private void UpdateAboutSectionCornerRadius()
+    {
+        bool storeVisible = StoreRow.Visibility == Visibility.Visible;
+
+        StoreRow.CornerRadius = new CornerRadius(0);
+        ResetRow.CornerRadius = new CornerRadius(0, 0, 4, 4);
+
+        if (storeVisible)
+        {
+            StoreRow.BorderThickness = new Thickness(1, 0, 1, 1);
+        }
+    }
+
+    /// <summary>
+    /// 处理主题选择变更事件。
     /// </summary>
     /// <param name="sender">事件源对象。</param>
     /// <param name="e">选择变更事件参数。</param>
     private void ThemeComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
-        if (_isUpdating || ThemeComboBox.SelectedItem is not ComboBoxItem { Tag: ThemeStyle theme })
+        if (_isProgrammaticUpdate)
         {
             return;
         }
 
-        if (Application.Current is App app)
+        if (ThemeComboBox.SelectedItem is ComboBoxItem { Tag: ThemeStyle theme } && Application.Current is App app)
         {
             app.UpdateTheme(theme);
         }
     }
 
     /// <summary>
-    /// 显示语言选择变更事件处理程序。
+    /// 处理显示语言选择变更事件。
     /// </summary>
     /// <param name="sender">事件源对象。</param>
     /// <param name="e">选择变更事件参数。</param>
     private void LanguageComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
-        if (_isUpdating || LanguageComboBox.SelectedItem is not ComboBoxItem { Tag: DisplayLanguage language })
+        if (_isProgrammaticUpdate)
+        {
+            return;
+        }
+
+        if (LanguageComboBox.SelectedItem is not ComboBoxItem { Tag: DisplayLanguage language })
         {
             return;
         }
 
         Config.Language = language;
-        LoadLocalizedTexts();
-        InitializeComboBoxItems();
-        LoadCurrentSettings();
+
+        _isProgrammaticUpdate = true;
+        ApplyLocalizedTexts();
+        PopulateComboBoxItems();
+        SynchronizeControlsWithConfig();
+        _isProgrammaticUpdate = false;
     }
 
     /// <summary>
-    /// 执行前确认开关切换事件处理程序。
+    /// 处理执行前确认开关切换事件。
     /// </summary>
     /// <param name="sender">事件源对象。</param>
     /// <param name="e">路由事件参数。</param>
     private void ConfirmToggle_Toggled(object sender, RoutedEventArgs e)
     {
-        if (_isUpdating)
+        if (!_isProgrammaticUpdate)
         {
-            return;
+            Config.ConfirmBeforeExecution = ConfirmToggle.IsOn;
         }
-
-        Config.ConfirmBeforeExecution = ConfirmToggle.IsOn;
     }
 
     /// <summary>
-    /// 语言选择框模式选择变更事件处理程序。
+    /// 处理语言选择框模式选择变更事件。
     /// </summary>
     /// <param name="sender">事件源对象。</param>
     /// <param name="e">选择变更事件参数。</param>
     private void SelectorModeComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
-        if (_isUpdating || SelectorModeComboBox.SelectedItem is not ComboBoxItem { Tag: LanguageSelectorMode mode })
+        if (!_isProgrammaticUpdate && SelectorModeComboBox.SelectedItem is ComboBoxItem { Tag: LanguageSelectorMode mode })
         {
-            return;
+            Config.SelectorMode = mode;
         }
-
-        Config.SelectorMode = mode;
     }
 
     /// <summary>
-    /// 执行后自动退出开关切换事件处理程序。
+    /// 处理执行后自动退出开关切换事件。
     /// </summary>
     /// <param name="sender">事件源对象。</param>
     /// <param name="e">路由事件参数。</param>
     private void AutoExitToggle_Toggled(object sender, RoutedEventArgs e)
     {
-        if (_isUpdating)
+        if (!_isProgrammaticUpdate)
         {
-            return;
+            Config.AutoExitAfterExecution = AutoExitToggle.IsOn;
         }
-
-        Config.AutoExitAfterExecution = AutoExitToggle.IsOn;
     }
 
     /// <summary>
-    /// 终端类型选择变更事件处理程序。
+    /// 处理终端类型选择变更事件。
     /// </summary>
     /// <param name="sender">事件源对象。</param>
     /// <param name="e">选择变更事件参数。</param>
     private void TerminalComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
-        if (_isUpdating || TerminalComboBox.SelectedItem is not ComboBoxItem { Tag: TerminalType terminal })
+        if (!_isProgrammaticUpdate && TerminalComboBox.SelectedItem is ComboBoxItem { Tag: TerminalType terminal })
         {
-            return;
+            Config.Terminal = terminal;
         }
-
-        Config.Terminal = terminal;
     }
 
     /// <summary>
-    /// 高级设置链接点击事件处理程序。
+    /// 处理高级设置链接点击事件。
     /// </summary>
     /// <param name="sender">事件源对象。</param>
     /// <param name="e">路由事件参数。</param>
     private async void AdvancedSettingsLink_Click(object sender, RoutedEventArgs e)
     {
-        ContentDialog dialog = CreateAdvancedSettingsDialog();
+        ContentDialog dialog = BuildAdvancedSettingsDialog();
         await dialog.ShowAsync();
     }
 
     /// <summary>
-    /// 创建高级设置对话框。
+    /// 构建高级设置对话框。
     /// </summary>
-    /// <returns>配置完成的 ContentDialog 实例。</returns>
-    private ContentDialog CreateAdvancedSettingsDialog()
+    /// <returns>配置完成的 <see cref="ContentDialog"/> 实例。</returns>
+    private ContentDialog BuildAdvancedSettingsDialog()
     {
-        StackPanel content = new() { Spacing = 16, MinWidth = 400 };
+        StackPanel contentPanel = new() { Spacing = 16, MinWidth = 450, Margin = new Thickness(0, 0, 8, 0) };
 
         TextBox prefixTextBox = new()
         {
@@ -318,98 +345,22 @@ public sealed partial class Settings : Page
             Text = Config.TempFilePrefix,
             PlaceholderText = "__RunOnceTMP__"
         };
-        content.Children.Add(prefixTextBox);
+        contentPanel.Children.Add(prefixTextBox);
 
-        StackPanel confidencePanel = new() { Spacing = 8 };
-        confidencePanel.Children.Add(new TextBlock
-        {
-            Text = Text.Localize("置信度范围"),
-            Style = (Style)Application.Current.Resources["BodyStrongTextBlockStyle"]
-        });
+        (StackPanel confidencePanel, NumberBox lowerBox, NumberBox upperBox) = BuildConfidenceRangeControls();
+        contentPanel.Children.Add(confidencePanel);
 
-        ConfidenceRange currentRange = Config.ConfidenceThreshold;
+        (StackPanel commandsPanel, Dictionary<string, TextBox> commandTextBoxes) = BuildLanguageCommandControls();
+        contentPanel.Children.Add(commandsPanel);
 
-        TextBlock lowerValueText = new() { Text = currentRange.LowerBound.ToString("F2") };
-        Slider lowerSlider = new()
-        {
-            Header = Text.Localize("下界"),
-            Minimum = 0,
-            Maximum = 1,
-            StepFrequency = 0.01,
-            Value = currentRange.LowerBound
-        };
-        lowerSlider.ValueChanged += (s, e) => lowerValueText.Text = e.NewValue.ToString("F2");
-
-        StackPanel lowerPanel = new() { Orientation = Orientation.Horizontal, Spacing = 8 };
-        lowerPanel.Children.Add(lowerSlider);
-        lowerPanel.Children.Add(lowerValueText);
-
-        TextBlock upperValueText = new() { Text = currentRange.UpperBound.ToString("F2") };
-        Slider upperSlider = new()
-        {
-            Header = Text.Localize("上界"),
-            Minimum = 0,
-            Maximum = 1,
-            StepFrequency = 0.01,
-            Value = currentRange.UpperBound
-        };
-        upperSlider.ValueChanged += (s, e) => upperValueText.Text = e.NewValue.ToString("F2");
-
-        StackPanel upperPanel = new() { Orientation = Orientation.Horizontal, Spacing = 8 };
-        upperPanel.Children.Add(upperSlider);
-        upperPanel.Children.Add(upperValueText);
-
-        confidencePanel.Children.Add(lowerPanel);
-        confidencePanel.Children.Add(upperPanel);
-        content.Children.Add(confidencePanel);
-
-        StackPanel languageCommandsPanel = new() { Spacing = 8 };
-        languageCommandsPanel.Children.Add(new TextBlock
-        {
-            Text = Text.Localize("语言执行命令"),
-            Style = (Style)Application.Current.Resources["BodyStrongTextBlockStyle"]
-        });
-
-        Dictionary<string, TextBox> commandTextBoxes = new();
-        foreach (string language in Config.SupportedLanguages)
-        {
-            TextBox textBox = new()
-            {
-                Header = language.ToUpperInvariant(),
-                Text = Config.GetLanguageCommand(language),
-                PlaceholderText = Config.GetLanguageCommand(language)
-            };
-            commandTextBoxes[language] = textBox;
-            languageCommandsPanel.Children.Add(textBox);
-        }
-        content.Children.Add(languageCommandsPanel);
-
-        HyperlinkButton resetAdvancedLink = new()
-        {
-            Content = Text.Localize("重置为默认"),
-            Padding = new Thickness(0)
-        };
-        resetAdvancedLink.Click += (s, e) =>
-        {
-            prefixTextBox.Text = "__RunOnceTMP__";
-            lowerSlider.Value = ConfidenceRange.DefaultLowerBound;
-            upperSlider.Value = ConfidenceRange.DefaultUpperBound;
-            foreach (string language in Config.SupportedLanguages)
-            {
-                if (commandTextBoxes.TryGetValue(language, out TextBox? textBox))
-                {
-                    Config.ResetLanguageCommand(language);
-                    textBox.Text = Config.GetLanguageCommand(language);
-                }
-            }
-        };
-        content.Children.Add(resetAdvancedLink);
+        HyperlinkButton resetLink = BuildResetAdvancedLink(prefixTextBox, lowerBox, upperBox, commandTextBoxes);
+        contentPanel.Children.Add(resetLink);
 
         ScrollViewer scrollViewer = new()
         {
-            Content = content,
-            MaxHeight = 500,
-            VerticalScrollBarVisibility = ScrollBarVisibility.Auto  // 修正此处
+            Content = contentPanel,
+            VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+            Padding = new Thickness(0, 0, 16, 0)
         };
 
         ContentDialog dialog = new()
@@ -422,34 +373,188 @@ public sealed partial class Settings : Page
             XamlRoot = XamlRoot
         };
 
-        dialog.PrimaryButtonClick += (s, e) =>
-        {
-            if (!string.IsNullOrWhiteSpace(prefixTextBox.Text))
-            {
-                Config.TempFilePrefix = prefixTextBox.Text;
-            }
-
-            double lower = lowerSlider.Value;
-            double upper = upperSlider.Value;
-            if (lower <= upper)
-            {
-                Config.ConfidenceThreshold = new ConfidenceRange(lower, upper);
-            }
-
-            foreach (string language in Config.SupportedLanguages)
-            {
-                if (commandTextBoxes.TryGetValue(language, out TextBox? textBox) && !string.IsNullOrWhiteSpace(textBox.Text))
-                {
-                    Config.SetLanguageCommand(language, textBox.Text);
-                }
-            }
-        };
+        dialog.PrimaryButtonClick += (_, _) => SaveAdvancedSettings(prefixTextBox, lowerBox, upperBox, commandTextBoxes);
 
         return dialog;
     }
 
     /// <summary>
-    /// GitHub 链接点击事件处理程序。
+    /// 构建置信度范围控件组。
+    /// </summary>
+    /// <returns>包含面板、下界数值框和上界数值框的元组。</returns>
+    private static (StackPanel Panel, NumberBox LowerBox, NumberBox UpperBox) BuildConfidenceRangeControls()
+    {
+        StackPanel panel = new() { Spacing = 12 };
+
+        panel.Children.Add(new TextBlock
+        {
+            Text = Text.Localize("置信度范围"),
+            Style = (Style)Application.Current.Resources["BodyStrongTextBlockStyle"]
+        });
+
+        ConfidenceRange currentRange = Config.ConfidenceThreshold;
+
+        Grid rangeGrid = new() { ColumnSpacing = 16 };
+        rangeGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        rangeGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+
+        NumberBox lowerBox = new()
+        {
+            Header = Text.Localize("下界"),
+            Value = currentRange.LowerBound,
+            Minimum = 0,
+            Maximum = 1,
+            SmallChange = 0.01,
+            LargeChange = 0.1,
+            SpinButtonPlacementMode = NumberBoxSpinButtonPlacementMode.Compact
+        };
+        Grid.SetColumn(lowerBox, 0);
+
+        NumberBox upperBox = new()
+        {
+            Header = Text.Localize("上界"),
+            Value = currentRange.UpperBound,
+            Minimum = 0,
+            Maximum = 1,
+            SmallChange = 0.01,
+            LargeChange = 0.1,
+            SpinButtonPlacementMode = NumberBoxSpinButtonPlacementMode.Compact
+        };
+        Grid.SetColumn(upperBox, 1);
+
+        rangeGrid.Children.Add(lowerBox);
+        rangeGrid.Children.Add(upperBox);
+        panel.Children.Add(rangeGrid);
+
+        return (panel, lowerBox, upperBox);
+    }
+
+    /// <summary>
+    /// 创建置信度滑块控件。
+    /// </summary>
+    /// <param name="header">滑块标题文本。</param>
+    /// <param name="initialValue">初始值，范围 [0, 1]。</param>
+    /// <returns>配置完成的 <see cref="Slider"/> 实例。</returns>
+    private static Slider CreateConfidenceSlider(string header, double initialValue)
+    {
+        return new Slider
+        {
+            Header = header,
+            Minimum = 0,
+            Maximum = 1,
+            StepFrequency = 0.01,
+            Value = initialValue
+        };
+    }
+
+    /// <summary>
+    /// 构建语言执行命令控件组。
+    /// </summary>
+    /// <returns>包含面板和命令文本框字典的元组。</returns>
+    private static (StackPanel Panel, Dictionary<string, TextBox> TextBoxes) BuildLanguageCommandControls()
+    {
+        StackPanel panel = new() { Spacing = 8 };
+
+        panel.Children.Add(new TextBlock
+        {
+            Text = Text.Localize("语言执行命令"),
+            Style = (Style)Application.Current.Resources["BodyStrongTextBlockStyle"]
+        });
+
+        Dictionary<string, TextBox> textBoxes = Config.SupportedLanguages
+            .ToDictionary(
+                language => language,
+                language =>
+                {
+                    TextBox textBox = new()
+                    {
+                        Header = language.ToUpperInvariant(),
+                        Text = Config.GetLanguageCommand(language),
+                        PlaceholderText = Config.GetLanguageCommand(language)
+                    };
+                    panel.Children.Add(textBox);
+                    return textBox;
+                });
+
+        return (panel, textBoxes);
+    }
+
+    /// <summary>
+    /// 构建重置高级设置链接按钮。
+    /// </summary>
+    /// <param name="prefixTextBox">临时文件前缀文本框。</param>
+    /// <param name="lowerBox">置信度下界数值框。</param>
+    /// <param name="upperBox">置信度上界数值框。</param>
+    /// <param name="commandTextBoxes">语言命令文本框字典。</param>
+    /// <returns>配置完成的 <see cref="HyperlinkButton"/> 实例。</returns>
+    private static HyperlinkButton BuildResetAdvancedLink(
+        TextBox prefixTextBox,
+        NumberBox lowerBox,
+        NumberBox upperBox,
+        Dictionary<string, TextBox> commandTextBoxes)
+    {
+        HyperlinkButton resetLink = new()
+        {
+            Content = Text.Localize("重置为默认"),
+            Padding = new Thickness(0),
+            HorizontalAlignment = HorizontalAlignment.Right
+        };
+
+        resetLink.Click += (_, _) =>
+        {
+            prefixTextBox.Text = "__RunOnceTMP__";
+            lowerBox.Value = ConfidenceRange.DefaultLowerBound;
+            upperBox.Value = ConfidenceRange.DefaultUpperBound;
+
+            foreach (string language in Config.SupportedLanguages)
+            {
+                Config.ResetLanguageCommand(language);
+                if (commandTextBoxes.TryGetValue(language, out TextBox? textBox))
+                {
+                    textBox.Text = Config.GetLanguageCommand(language);
+                }
+            }
+        };
+
+        return resetLink;
+    }
+
+    /// <summary>
+    /// 保存高级设置到配置。
+    /// </summary>
+    /// <param name="prefixTextBox">临时文件前缀文本框。</param>
+    /// <param name="lowerBox">置信度下界数值框。</param>
+    /// <param name="upperBox">置信度上界数值框。</param>
+    /// <param name="commandTextBoxes">语言命令文本框字典。</param>
+    private static void SaveAdvancedSettings(
+        TextBox prefixTextBox,
+        NumberBox lowerBox,
+        NumberBox upperBox,
+        Dictionary<string, TextBox> commandTextBoxes)
+    {
+        if (!string.IsNullOrWhiteSpace(prefixTextBox.Text))
+        {
+            Config.TempFilePrefix = prefixTextBox.Text;
+        }
+
+        double lower = lowerBox.Value;
+        double upper = upperBox.Value;
+        if (!double.IsNaN(lower) && !double.IsNaN(upper) && lower <= upper)
+        {
+            Config.ConfidenceThreshold = new ConfidenceRange(lower, upper);
+        }
+
+        foreach ((string language, TextBox textBox) in commandTextBoxes)
+        {
+            if (!string.IsNullOrWhiteSpace(textBox.Text))
+            {
+                Config.SetLanguageCommand(language, textBox.Text);
+            }
+        }
+    }
+
+    /// <summary>
+    /// 处理 GitHub 链接点击事件。
     /// </summary>
     /// <param name="sender">事件源对象。</param>
     /// <param name="e">路由事件参数。</param>
@@ -462,7 +567,7 @@ public sealed partial class Settings : Page
     }
 
     /// <summary>
-    /// 微软商店链接点击事件处理程序。
+    /// 处理微软商店链接点击事件。
     /// </summary>
     /// <param name="sender">事件源对象。</param>
     /// <param name="e">路由事件参数。</param>
@@ -475,7 +580,7 @@ public sealed partial class Settings : Page
     }
 
     /// <summary>
-    /// 重置所有设置链接点击事件处理程序。
+    /// 处理重置所有设置链接点击事件。
     /// </summary>
     /// <param name="sender">事件源对象。</param>
     /// <param name="e">路由事件参数。</param>
@@ -492,59 +597,94 @@ public sealed partial class Settings : Page
         };
 
         ContentDialogResult result = await confirmDialog.ShowAsync();
-        if (result == ContentDialogResult.Primary)
+        if (result != ContentDialogResult.Primary)
         {
-            Config.ResetAllSettings();
-
-            if (Application.Current is App app)
-            {
-                app.ApplyTheme(Config.Theme);
-            }
-
-            _isUpdating = true;
-            LoadLocalizedTexts();
-            InitializeComboBoxItems();
-            LoadCurrentSettings();
-            _isUpdating = false;
+            return;
         }
+
+        Config.ResetAllSettings();
+
+        if (Application.Current is App app)
+        {
+            app.ApplyTheme(Config.Theme);
+        }
+
+        _isProgrammaticUpdate = true;
+        ApplyLocalizedTexts();
+        PopulateComboBoxItems();
+        SynchronizeControlsWithConfig();
+        _isProgrammaticUpdate = false;
     }
 
     /// <summary>
     /// 获取程序集的编译时间。
     /// </summary>
-    /// <returns>编译时间的 DateTime 表示，若无法获取则返回当前时间。</returns>
-    private static DateTime GetBuildTime()
+    /// <returns>编译时间的 <see cref="DateTime"/> 表示，若无法获取则返回当前时间。</returns>
+    private static DateTime RetrieveBuildTime()
     {
-        System.Reflection.Assembly assembly = System.Reflection.Assembly.GetExecutingAssembly();
-        System.Reflection.AssemblyInformationalVersionAttribute? attribute =
-            assembly.GetCustomAttributes(typeof(System.Reflection.AssemblyInformationalVersionAttribute), false)
-                .OfType<System.Reflection.AssemblyInformationalVersionAttribute>()
-                .FirstOrDefault();
+        Assembly assembly = Assembly.GetExecutingAssembly();
 
-        if (attribute?.InformationalVersion is string version)
+        DateTime? versionBasedTime = TryGetBuildTimeFromVersion(assembly);
+        if (versionBasedTime.HasValue)
         {
-            int plusIndex = version.IndexOf('+');
-            if (plusIndex >= 0 && version.Length > plusIndex + 1)
-            {
-                string commitInfo = version[(plusIndex + 1)..];
-                if (commitInfo.Length >= 14 && DateTime.TryParseExact(
-                    commitInfo[..14],
-                    "yyyyMMddHHmmss",
-                    System.Globalization.CultureInfo.InvariantCulture,
-                    System.Globalization.DateTimeStyles.None,
-                    out DateTime parsedTime))
-                {
-                    return parsedTime;
-                }
-            }
+            return versionBasedTime.Value;
         }
 
-        string? filePath = assembly.Location;
-        if (!string.IsNullOrEmpty(filePath) && System.IO.File.Exists(filePath))
+        DateTime? fileBasedTime = TryGetBuildTimeFromFile(assembly);
+        if (fileBasedTime.HasValue)
         {
-            return System.IO.File.GetLastWriteTime(filePath);
+            return fileBasedTime.Value;
         }
 
         return DateTime.Now;
+    }
+
+    /// <summary>
+    /// 尝试从程序集版本信息获取编译时间。
+    /// </summary>
+    /// <param name="assembly">目标程序集，不允许为 null。</param>
+    /// <returns>解析成功时返回编译时间，否则返回 null。</returns>
+    private static DateTime? TryGetBuildTimeFromVersion(Assembly assembly)
+    {
+        AssemblyInformationalVersionAttribute? attribute = assembly
+            .GetCustomAttributes(typeof(AssemblyInformationalVersionAttribute), false)
+            .OfType<AssemblyInformationalVersionAttribute>()
+            .FirstOrDefault();
+
+        if (attribute?.InformationalVersion is not { } version)
+        {
+            return null;
+        }
+
+        int plusIndex = version.IndexOf('+');
+        if (plusIndex < 0 || version.Length <= plusIndex + 14)
+        {
+            return null;
+        }
+
+        string timestampPart = version[(plusIndex + 1)..(plusIndex + 15)];
+
+        return DateTime.TryParseExact(
+            timestampPart,
+            "yyyyMMddHHmmss",
+            CultureInfo.InvariantCulture,
+            DateTimeStyles.None,
+            out DateTime parsedTime)
+            ? parsedTime
+            : null;
+    }
+
+    /// <summary>
+    /// 尝试从程序集文件获取编译时间。
+    /// </summary>
+    /// <param name="assembly">目标程序集，不允许为 null。</param>
+    /// <returns>文件存在时返回最后修改时间，否则返回 null。</returns>
+    private static DateTime? TryGetBuildTimeFromFile(Assembly assembly)
+    {
+        string? filePath = assembly.Location;
+
+        return !string.IsNullOrEmpty(filePath) && File.Exists(filePath)
+            ? File.GetLastWriteTime(filePath)
+            : null;
     }
 }

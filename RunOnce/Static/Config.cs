@@ -4,7 +4,7 @@
  * 
  * @author: WaterRun
  * @file: Static/Config.cs
- * @date: 2026-02-04
+ * @date: 2026-02-05
  */
 
 #nullable enable
@@ -745,7 +745,7 @@ public static class Config
         {
             DisplayLanguage.FollowSystem => Text.Localize("跟随系统"),
             DisplayLanguage.Chinese => Text.Localize("简体中文"),
-            DisplayLanguage.English => Text.Localize("英文"),
+            DisplayLanguage.English => Text.Localize("English"),
             _ => language.ToString()
         };
     }
@@ -775,7 +775,7 @@ public static class Config
     {
         return terminal switch
         {
-            TerminalType.WindowsTerminal => Text.Localize("Windows Terminal"),
+            TerminalType.WindowsTerminal => Text.Localize("Windows 终端"),
             TerminalType.Cmd => Text.Localize("命令提示符"),
             _ => terminal.ToString()
         };

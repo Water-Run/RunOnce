@@ -41,8 +41,8 @@ public static class Text
         ["深色"] = "Dark",
 
         // 显示语言
-        ["简体中文"] = "Simplified Chinese",
-        ["英文"] = "English",
+        ["简体中文"] = "简体中文",
+        ["English"] = "English",
 
         // 语言选择器模式
         ["始终显示"] = "Always Show",
@@ -50,7 +50,7 @@ public static class Text
         ["仅无可信时显示"] = "Show Only When No Confidence",
 
         // 终端类型
-        ["Windows Terminal"] = "Windows Terminal",
+        ["Windows 终端"] = "Windows Terminal",
         ["命令提示符"] = "Command Prompt",
 
         // 页面标题
@@ -78,6 +78,8 @@ public static class Text
         ["终端类型"] = "Terminal Type",
         ["选择执行代码使用的终端程序"] = "Choose the terminal program for code execution",
         ["高级设置"] = "Advanced Settings",
+        ["配置临时文件、置信度阈值和语言命令"] = "Configure the temporary file, confidence threshold, and language commands",
+        ["打开"] = "Open",
 
         // 设置页面 - 关于
         ["软件名"] = "App Name",
