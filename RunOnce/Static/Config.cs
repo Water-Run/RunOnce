@@ -285,6 +285,21 @@ public static class Config
     /// <summary>脚本放置行为设置项的存储键名。</summary>
     private const string KeyScriptPlacement = "ScriptPlacement";
 
+    /// <summary>LLM API Key 设置项的存储键名。</summary>
+    private const string KeyLlmApiKey = "LlmApiKey";
+
+    /// <summary>LLM API 基础 URL 设置项的存储键名。</summary>
+    private const string KeyLlmBaseUrl = "LlmBaseUrl";
+
+    /// <summary>LLM 模型名称设置项的存储键名。</summary>
+    private const string KeyLlmModel = "LlmModel";
+
+    /// <summary>LLM 单次请求最大 Token 数设置项的存储键名。</summary>
+    private const string KeyLlmMaxTokens = "LlmMaxTokens";
+
+    /// <summary>LLM 请求超时秒数设置项的存储键名。</summary>
+    private const string KeyLlmTimeoutSeconds = "LlmTimeoutSeconds";
+
     #endregion
 
     #region 默认值常量
@@ -297,6 +312,18 @@ public static class Config
 
     /// <summary>置信度阈值的默认值。</summary>
     public const double DefaultConfidenceThreshold = 0.85;
+
+    /// <summary>LLM API 基础 URL 的默认值（OpenAI 兼容端点）。</summary>
+    public const string DefaultLlmBaseUrl = "https://api.openai.com/v1";
+
+    /// <summary>LLM 模型名称的默认值。</summary>
+    public const string DefaultLlmModel = "gpt-4o-mini";
+
+    /// <summary>LLM 单次请求最大 Token 数的默认值。</summary>
+    public const int DefaultLlmMaxTokens = 4096;
+
+    /// <summary>LLM 请求超时秒数的默认值。</summary>
+    public const int DefaultLlmTimeoutSeconds = 60;
 
     #endregion
 
@@ -648,6 +675,154 @@ public static class Config
         }
     }
 
+    /// <summary>
+    /// 获取或设置 LLM API Key。
+    /// </summary>
+    /// <value>
+    /// 字符串，默认为空。未配置时 LlmClient 将拒绝发起请求。
+    /// 设置时立即持久化到本地存储。
+    /// </value>
+    public static string LlmApiKey
+    {
+        get
+        {
+            lock (_syncLock)
+            {
+                return _localSettings.Values.TryGetValue(KeyLlmApiKey, out object? value)
+                       && value is string stringValue
+                    ? stringValue
+                    : string.Empty;
+            }
+        }
+        set
+        {
+            lock (_syncLock)
+            {
+                _localSettings.Values[KeyLlmApiKey] = value ?? string.Empty;
+            }
+        }
+    }
+
+    /// <summary>
+    /// 获取或设置 LLM API 基础 URL（OpenAI 兼容端点）。
+    /// </summary>
+    /// <value>
+    /// 字符串，默认为 "https://api.openai.com/v1"。
+    /// 设置时立即持久化到本地存储。
+    /// </value>
+    public static string LlmBaseUrl
+    {
+        get
+        {
+            lock (_syncLock)
+            {
+                return _localSettings.Values.TryGetValue(KeyLlmBaseUrl, out object? value)
+                       && value is string stringValue
+                       && !string.IsNullOrWhiteSpace(stringValue)
+                    ? stringValue
+                    : DefaultLlmBaseUrl;
+            }
+        }
+        set
+        {
+            lock (_syncLock)
+            {
+                _localSettings.Values[KeyLlmBaseUrl] = string.IsNullOrWhiteSpace(value)
+                    ? DefaultLlmBaseUrl
+                    : value;
+            }
+        }
+    }
+
+    /// <summary>
+    /// 获取或设置 LLM 模型名称。
+    /// </summary>
+    /// <value>
+    /// 字符串，默认为 "gpt-4o-mini"。
+    /// 设置时立即持久化到本地存储。
+    /// </value>
+    public static string LlmModel
+    {
+        get
+        {
+            lock (_syncLock)
+            {
+                return _localSettings.Values.TryGetValue(KeyLlmModel, out object? value)
+                       && value is string stringValue
+                       && !string.IsNullOrWhiteSpace(stringValue)
+                    ? stringValue
+                    : DefaultLlmModel;
+            }
+        }
+        set
+        {
+            lock (_syncLock)
+            {
+                _localSettings.Values[KeyLlmModel] = string.IsNullOrWhiteSpace(value)
+                    ? DefaultLlmModel
+                    : value;
+            }
+        }
+    }
+
+    /// <summary>
+    /// 获取或设置 LLM 单次请求允许生成的最大 Token 数。
+    /// </summary>
+    /// <value>
+    /// 正整数，默认为 4096。
+    /// 设置时立即持久化到本地存储。
+    /// </value>
+    public static int LlmMaxTokens
+    {
+        get
+        {
+            lock (_syncLock)
+            {
+                return _localSettings.Values.TryGetValue(KeyLlmMaxTokens, out object? value)
+                       && value is int intValue
+                       && intValue > 0
+                    ? intValue
+                    : DefaultLlmMaxTokens;
+            }
+        }
+        set
+        {
+            lock (_syncLock)
+            {
+                _localSettings.Values[KeyLlmMaxTokens] = value > 0 ? value : DefaultLlmMaxTokens;
+            }
+        }
+    }
+
+    /// <summary>
+    /// 获取或设置 LLM 请求的超时秒数。
+    /// </summary>
+    /// <value>
+    /// 正整数，默认为 60。
+    /// 设置时立即持久化到本地存储。
+    /// </value>
+    public static int LlmTimeoutSeconds
+    {
+        get
+        {
+            lock (_syncLock)
+            {
+                return _localSettings.Values.TryGetValue(KeyLlmTimeoutSeconds, out object? value)
+                       && value is int intValue
+                       && intValue > 0
+                    ? intValue
+                    : DefaultLlmTimeoutSeconds;
+            }
+        }
+        set
+        {
+            lock (_syncLock)
+            {
+                _localSettings.Values[KeyLlmTimeoutSeconds] = value > 0 ? value : DefaultLlmTimeoutSeconds;
+            }
+        }
+    }
+
     #endregion
 
     #region 语言指令配置
@@ -895,6 +1070,11 @@ public static class Config
             _localSettings.Values[KeyAutoCloseTerminalOnCompletion] = false;
             _localSettings.Values[KeyShellType] = (int)ShellType.PowerShellUtf8;
             _localSettings.Values[KeyScriptPlacement] = (int)ScriptPlacementBehavior.EnsureCleanup;
+            _localSettings.Values[KeyLlmApiKey] = string.Empty;
+            _localSettings.Values[KeyLlmBaseUrl] = DefaultLlmBaseUrl;
+            _localSettings.Values[KeyLlmModel] = DefaultLlmModel;
+            _localSettings.Values[KeyLlmMaxTokens] = DefaultLlmMaxTokens;
+            _localSettings.Values[KeyLlmTimeoutSeconds] = DefaultLlmTimeoutSeconds;
             _languageCommands = CreateDefaultLanguageCommands();
             _languageCommandsLoaded = true;
             PersistLanguageCommands();

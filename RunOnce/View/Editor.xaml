@@ -32,6 +32,7 @@
     <Page.KeyboardAccelerators>
         <KeyboardAccelerator Key="Enter" Modifiers="Control" Invoked="ExecuteAccelerator_Invoked"/>
         <KeyboardAccelerator Key="E" Modifiers="Control" Invoked="ArgsAccelerator_Invoked"/>
+        <KeyboardAccelerator Key="G" Modifiers="Control" Invoked="AiGenerateAccelerator_Invoked"/>
     </Page.KeyboardAccelerators>
 
     <Grid Background="Transparent">

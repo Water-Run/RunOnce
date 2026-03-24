@@ -183,6 +183,35 @@ public static class Text
         ["工作目录不存在: {0}。"] = "Working directory does not exist: {0}.",
         ["无法创建临时文件: {0}。"] = "Failed to create temporary file: {0}.",
         ["无法启动终端进程。"] = "Failed to start terminal process.",
+
+        // LLM 功能
+        ["AI 设置"] = "AI Settings",
+        ["配置 LLM API 以生成脚本代码"] = "Configure LLM API to generate script code",
+        ["AI 生成代码"] = "AI Generate Code",
+        ["描述你的需求"] = "Describe your requirements",
+        ["例如：列出当前目录下所有.txt文件"] = "e.g.: List all .txt files in current directory",
+        ["生成"] = "Generate",
+        ["自动"] = "Auto",
+        ["AI 生成"] = "AI Generate",
+        ["正在生成..."] = "Generating...",
+
+        // LLM 设置对话框
+        ["API Key"] = "API Key",
+        ["输入 API Key"] = "Enter API Key",
+        ["API 基础 URL"] = "API Base URL",
+        ["模型名称"] = "Model Name",
+        ["最大 Token 数"] = "Max Tokens",
+        ["请求超时（秒）"] = "Request Timeout (s)",
+
+        // LLM 错误消息
+        ["需求描述不能为空。"] = "Requirements description cannot be empty.",
+        ["尚未配置 API Key，请在设置中配置 LLM API Key。"] = "API Key is not configured. Please set the LLM API Key in Settings.",
+        ["LLM API 请求超时，请检查网络连接或在设置中增加超时时间。"] = "LLM API request timed out. Please check your network connection or increase the timeout in Settings.",
+        ["LLM API 返回错误 ({0}): {1}"] = "LLM API returned error ({0}): {1}",
+        ["你是一个专业的脚本生成助手。根据用户的需求，使用 {0} 语言生成可执行的脚本代码。仅输出脚本代码本身，不要包含任何解释、注释说明或 Markdown 代码块标记。"] =
+            "You are a professional script generation assistant. Generate executable script code in {0} based on the user's requirements. Output only the script code itself, without any explanations, comments, or Markdown code block markers.",
+        ["你是一个专业的脚本生成助手。根据用户的需求生成可执行的脚本代码。仅输出脚本代码本身，不要包含任何解释、注释说明或 Markdown 代码块标记。支持的语言：bat、powershell、python、lua、nim、go。根据需求自动选择最合适的语言。"] =
+            "You are a professional script generation assistant. Generate executable script code based on the user's requirements. Output only the script code itself, without any explanations, comments, or Markdown code block markers. Supported languages: bat, powershell, python, lua, nim, go. Automatically choose the most appropriate language.",
     };
 
     /// <summary>

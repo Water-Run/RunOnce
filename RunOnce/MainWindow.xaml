@@ -23,6 +23,7 @@
                 <ColumnDefinition Width="Auto"/>
                 <ColumnDefinition Width="Auto"/>
                 <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="Auto"/>
             </Grid.ColumnDefinitions>
 
             <!-- 返回按钮 -->
@@ -69,10 +70,22 @@
                 </Grid>
             </Button>
 
+            <!-- AI 生成按钮 -->
+            <Button
+                x:Name="AiButton"
+                Grid.Column="3"
+                Style="{ThemeResource SubtleButtonStyle}"
+                Width="48"
+                Height="48"
+                Visibility="Visible"
+                Click="AiButton_Click">
+                <FontIcon FontFamily="{ThemeResource SymbolThemeFontFamily}" Glyph="&#xE82F;" FontSize="14"/>
+            </Button>
+
             <!-- 运行按钮 -->
             <Button
                 x:Name="RunButton"
-                Grid.Column="3"
+                Grid.Column="4"
                 Style="{ThemeResource SubtleButtonStyle}"
                 Width="48"
                 Height="48"
@@ -84,7 +97,7 @@
             <!-- 设置按钮 -->
             <Button
                 x:Name="SettingsButton"
-                Grid.Column="4"
+                Grid.Column="5"
                 Style="{ThemeResource SubtleButtonStyle}"
                 Width="48"
                 Height="48"

@@ -22,6 +22,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using Windows.ApplicationModel.DataTransfer;
 using Windows.Foundation;
@@ -93,6 +94,11 @@ public sealed partial class Editor : Page
     private bool _pendingHighlightAfterPointerRelease;
 
     /// <summary>
+    /// 标识当前是否正在通过 AI 生成代码，防止重入。
+    /// </summary>
+    private bool _isAiGenerating;
+
+    /// <summary>
     /// RichEditBox 内部 ScrollViewer 的缓存引用，在页面加载时获取。
     /// </summary>
     private ScrollViewer? _scrollViewer;
@@ -131,6 +137,12 @@ public sealed partial class Editor : Page
         UpdatePlaceholderText();
         UpdatePlaceholderVisibility();
         CodeEditor.Focus(FocusState.Programmatic);
+
+        // 若以 AI 模式启动，自动打开 AI 生成对话框
+        if (Application.Current is App { IsAiMode: true })
+        {
+            _ = HandleAiGenerateAsync();
+        }
     }
 
     /// <summary>
@@ -280,6 +292,7 @@ public sealed partial class Editor : Page
         string text = GetPlainText();
         if (string.IsNullOrEmpty(text))
         {
+            // 编辑器为空时，优先提供粘贴与 AI 生成两种入口
             await PasteTextFromClipboardAsync();
             return;
         }
@@ -339,6 +352,17 @@ public sealed partial class Editor : Page
         bool hasSelection = CodeEditor.Document.Selection.StartPosition != CodeEditor.Document.Selection.EndPosition;
 
         MenuFlyout flyout = new();
+
+        MenuFlyoutItem aiItem = new()
+        {
+            Text = Text.Localize("AI 生成"),
+            Icon = new FontIcon { FontFamily = new FontFamily("Segoe MDL2 Assets"), Glyph = "\xE82F" },
+            KeyboardAcceleratorTextOverride = "Ctrl+G",
+        };
+        aiItem.Click += (_, _) => _ = HandleAiGenerateAsync();
+        flyout.Items.Add(aiItem);
+
+        flyout.Items.Add(new MenuFlyoutSeparator());
 
         MenuFlyoutItem redoItem = new()
         {
@@ -620,6 +644,13 @@ public sealed partial class Editor : Page
                 return;
             }
 
+            if (e.Key == VirtualKey.G)
+            {
+                e.Handled = true;
+                _ = HandleAiGenerateAsync();
+                return;
+            }
+
             if (e.Key is VirtualKey.B or VirtualKey.I or VirtualKey.U)
             {
                 e.Handled = true;
@@ -661,6 +692,15 @@ public sealed partial class Editor : Page
     {
         args.Handled = true;
         _ = HandleArgsRequestAsync();
+    }
+
+    /// <summary>
+    /// 处理 Ctrl+G 快捷键（Page 级后备）。
+    /// </summary>
+    private void AiGenerateAccelerator_Invoked(KeyboardAccelerator sender, KeyboardAcceleratorInvokedEventArgs args)
+    {
+        args.Handled = true;
+        _ = HandleAiGenerateAsync();
     }
 
     /// <summary>
@@ -909,6 +949,244 @@ public sealed partial class Editor : Page
         if (Application.Current is App { MainWindow: MainWindow mw })
         {
             mw.UpdateArgsDotVisibility(ViewModel.HasCommandLineArguments);
+        }
+    }
+
+    #endregion
+
+    #region AI 生成代码
+
+    /// <summary>
+    /// 显示 AI 代码生成对话框，允许用户输入需求描述，调用 LLM 生成并加载脚本代码。
+    /// </summary>
+    public async Task HandleAiGenerateAsync()
+    {
+        if (_isAiGenerating || XamlRoot is null)
+        {
+            return;
+        }
+
+        _isAiGenerating = true;
+
+        try
+        {
+            await ShowAiGenerateDialogAsync();
+        }
+        finally
+        {
+            _isAiGenerating = false;
+        }
+    }
+
+    /// <summary>
+    /// 构建并显示 AI 生成对话框，执行生成流程。
+    /// </summary>
+    private async Task ShowAiGenerateDialogAsync()
+    {
+        // ── 构建对话框内容 ──
+        StackPanel contentPanel = new() { Spacing = 12, MinWidth = 480 };
+
+        TextBox promptBox = new()
+        {
+            Header = Text.Localize("描述你的需求"),
+            PlaceholderText = Text.Localize("例如：列出当前目录下所有.txt文件"),
+            AcceptsReturn = false,
+        };
+        contentPanel.Children.Add(promptBox);
+
+        // 语言选择行
+        StackPanel langRow = new()
+        {
+            Orientation = Orientation.Horizontal,
+            Spacing = 8,
+            VerticalAlignment = VerticalAlignment.Center,
+        };
+
+        langRow.Children.Add(new TextBlock
+        {
+            Text = Text.Localize("语言"),
+            VerticalAlignment = VerticalAlignment.Center,
+            Style = (Style)Application.Current.Resources["BodyTextBlockStyle"],
+        });
+
+        var langOptions = new List<string> { Text.Localize("自动") };
+        langOptions.AddRange(Config.SupportedLanguages.Select(l => l.ToUpperInvariant()));
+
+        ComboBox langBox = new()
+        {
+            ItemsSource = langOptions,
+            SelectedIndex = 0,
+            MinWidth = 130,
+            VerticalAlignment = VerticalAlignment.Center,
+        };
+        langRow.Children.Add(langBox);
+        contentPanel.Children.Add(langRow);
+
+        // 进度环（初始隐藏）
+        StackPanel progressRow = new()
+        {
+            Orientation = Orientation.Horizontal,
+            Spacing = 10,
+            Visibility = Visibility.Collapsed,
+            VerticalAlignment = VerticalAlignment.Center,
+        };
+        progressRow.Children.Add(new ProgressRing { IsActive = true, Width = 20, Height = 20 });
+        progressRow.Children.Add(new TextBlock
+        {
+            Text = Text.Localize("正在生成..."),
+            Style = (Style)Application.Current.Resources["CaptionTextBlockStyle"],
+            VerticalAlignment = VerticalAlignment.Center,
+        });
+        contentPanel.Children.Add(progressRow);
+
+        // 错误提示（初始隐藏）
+        TextBlock errorText = new()
+        {
+            Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 196, 43, 28)),
+            TextWrapping = TextWrapping.Wrap,
+            Visibility = Visibility.Collapsed,
+        };
+        contentPanel.Children.Add(errorText);
+
+        // ── 构建对话框 ──
+        ContentDialog dialog = new()
+        {
+            Title = Text.Localize("AI 生成代码"),
+            Content = contentPanel,
+            PrimaryButtonText = Text.Localize("生成"),
+            CloseButtonText = Text.Localize("取消"),
+            DefaultButton = ContentDialogButton.Primary,
+            XamlRoot = XamlRoot,
+        };
+
+        string? generatedCode = null;
+        CancellationTokenSource? cts = null;
+
+        // ── 生成按钮点击处理（保持对话框打开，异步执行）──
+        dialog.PrimaryButtonClick += async (_, args) =>
+        {
+            string prompt = promptBox.Text.Trim();
+            if (string.IsNullOrWhiteSpace(prompt))
+            {
+                args.Cancel = true;
+                return;
+            }
+
+            // 防止对话框关闭，切换为加载状态
+            args.Cancel = true;
+            cts?.Dispose();
+            cts = new CancellationTokenSource();
+            await RunGenerationAsync(
+                dialog, promptBox, langBox, progressRow, errorText,
+                code => { generatedCode = code; },
+                cts);
+        };
+
+        // 取消按钮点击时中止正在进行的请求
+        dialog.CloseButtonClick += (_, _) => cts?.Cancel();
+
+        // Enter 键快速提交（与点击"生成"按钮等效）
+        promptBox.KeyDown += (_, keyArgs) =>
+        {
+            if (keyArgs.Key == VirtualKey.Enter)
+            {
+                keyArgs.Handled = true;
+                string prompt = promptBox.Text.Trim();
+                if (!string.IsNullOrWhiteSpace(prompt) && dialog.IsPrimaryButtonEnabled)
+                {
+                    cts?.Dispose();
+                    cts = new CancellationTokenSource();
+                    _ = RunGenerationAsync(
+                        dialog, promptBox, langBox, progressRow, errorText,
+                        code => { generatedCode = code; },
+                        cts);
+                }
+            }
+        };
+
+        await dialog.ShowAsync();
+
+        // ── 释放 CTS 并将生成结果加载到编辑器 ──
+        cts?.Dispose();
+        cts = null;
+
+        if (!string.IsNullOrEmpty(generatedCode))
+        {
+            LoadCodeIntoEditor(generatedCode);
+        }
+    }
+
+    /// <summary>
+    /// 将生成的代码加载到编辑器，并触发语言检测与高亮。
+    /// </summary>
+    private void LoadCodeIntoEditor(string code)
+    {
+        _isApplyingFormatting = true;
+        try
+        {
+            CodeEditor.Document.SetText(Microsoft.UI.Text.TextSetOptions.None, code);
+        }
+        finally
+        {
+            _isApplyingFormatting = false;
+        }
+
+        string normalizedCode = NormalizeForAnalysis(code);
+        ViewModel.RunDetection(normalizedCode);
+        ViewModel.ManualLanguage = null;
+
+        InvalidateHighlightCache();
+        ApplyViewportHighlighting(code);
+        UpdatePlaceholderVisibility();
+
+        CodeEditor.Document.Selection.SetRange(0, 0);
+        CodeEditor.Focus(FocusState.Programmatic);
+    }
+
+    /// <summary>
+    /// 执行 AI 生成的核心逻辑：调用 LlmClient，更新对话框 UI 状态，成功后关闭对话框。
+    /// </summary>
+    /// <remarks>
+    /// 注意：调用方负责 cts 的释放，本方法不释放 cts。
+    /// </remarks>
+    private static async Task RunGenerationAsync(
+        ContentDialog dialog,
+        TextBox promptBox,
+        ComboBox langBox,
+        StackPanel progressRow,
+        TextBlock errorText,
+        Action<string> onSuccess,
+        CancellationTokenSource? cts = null)
+    {
+        dialog.IsPrimaryButtonEnabled = false;
+        promptBox.IsEnabled = false;
+        langBox.IsEnabled = false;
+        progressRow.Visibility = Visibility.Visible;
+        errorText.Visibility = Visibility.Collapsed;
+
+        string? preferredLanguage = langBox.SelectedIndex > 0
+            ? Config.SupportedLanguages[langBox.SelectedIndex - 1]
+            : null;
+
+        try
+        {
+            CancellationToken token = cts?.Token ?? CancellationToken.None;
+            string code = await LlmClient.GenerateScriptAsync(promptBox.Text.Trim(), preferredLanguage, token);
+            onSuccess(code);
+            dialog.Hide();
+        }
+        catch (OperationCanceledException)
+        {
+            // 用户取消，静默处理
+        }
+        catch (Exception ex)
+        {
+            progressRow.Visibility = Visibility.Collapsed;
+            errorText.Text = ex.Message;
+            errorText.Visibility = Visibility.Visible;
+            dialog.IsPrimaryButtonEnabled = true;
+            promptBox.IsEnabled = true;
+            langBox.IsEnabled = true;
         }
     }
 

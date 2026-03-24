@@ -212,6 +212,9 @@ public sealed partial class Settings : Page
         AdvancedSettingsLabel.Text = Text.Localize("高级设置");
         AdvancedSettingsDescription.Text = Text.Localize("配置临时文件、置信度阈值和语言命令");
         AdvancedSettingsButton.Content = Text.Localize("打开");
+        AiSettingsLabel.Text = Text.Localize("AI 设置");
+        AiSettingsDescription.Text = Text.Localize("配置 LLM API 以生成脚本代码");
+        AiSettingsButton.Content = Text.Localize("打开");
 
         ApplyWideLocalizedTexts();
         ApplyNarrowAboutLocalizedTexts();
@@ -262,6 +265,7 @@ public sealed partial class Settings : Page
         StackPanel panel = new() { Spacing = 8, MinWidth = 380 };
 
         AddShortcutRow(panel, "Ctrl+Enter", Text.Localize("执行代码"));
+        AddShortcutRow(panel, "Ctrl+G", Text.Localize("AI 生成代码"));
         AddShortcutRow(panel, "Ctrl+E", Text.Localize("命令行参数"));
         AddShortcutRow(panel, "Ctrl+Y", Text.Localize("重做"));
         AddShortcutRow(panel, "Ctrl+A", Text.Localize("全选"));
@@ -496,6 +500,143 @@ public sealed partial class Settings : Page
 
         ApplyLocalizedTexts();
         RefreshStoreRowVisibility();
+    }
+
+    #endregion
+
+    #region AI 设置对话框
+
+    private async void AiSettingsButton_Click(object sender, RoutedEventArgs e)
+    {
+        ContentDialog dialog = BuildAiSettingsDialog();
+        await dialog.ShowAsync();
+    }
+
+    private ContentDialog BuildAiSettingsDialog()
+    {
+        StackPanel contentPanel = new() { Spacing = 16, MinWidth = 450, Margin = new Thickness(0, 0, 8, 0) };
+
+        PasswordBox apiKeyBox = new()
+        {
+            Header = Text.Localize("API Key"),
+            PlaceholderText = Text.Localize("输入 API Key"),
+            Password = Config.LlmApiKey,
+        };
+        contentPanel.Children.Add(apiKeyBox);
+
+        TextBox baseUrlBox = new()
+        {
+            Header = Text.Localize("API 基础 URL"),
+            Text = Config.LlmBaseUrl,
+            PlaceholderText = Config.DefaultLlmBaseUrl,
+        };
+        contentPanel.Children.Add(baseUrlBox);
+
+        TextBox modelBox = new()
+        {
+            Header = Text.Localize("模型名称"),
+            Text = Config.LlmModel,
+            PlaceholderText = Config.DefaultLlmModel,
+        };
+        contentPanel.Children.Add(modelBox);
+
+        NumberBox maxTokensBox = new()
+        {
+            Header = Text.Localize("最大 Token 数"),
+            Value = Config.LlmMaxTokens,
+            Minimum = 256,
+            Maximum = 32768,
+            SmallChange = 256,
+            LargeChange = 1024,
+            SpinButtonPlacementMode = NumberBoxSpinButtonPlacementMode.Compact,
+        };
+        contentPanel.Children.Add(maxTokensBox);
+
+        NumberBox timeoutBox = new()
+        {
+            Header = Text.Localize("请求超时（秒）"),
+            Value = Config.LlmTimeoutSeconds,
+            Minimum = 10,
+            Maximum = 300,
+            SmallChange = 10,
+            LargeChange = 30,
+            SpinButtonPlacementMode = NumberBoxSpinButtonPlacementMode.Compact,
+        };
+        contentPanel.Children.Add(timeoutBox);
+
+        HyperlinkButton resetLink = new()
+        {
+            Content = Text.Localize("重置为默认"),
+            Padding = new Thickness(0),
+            HorizontalAlignment = HorizontalAlignment.Right,
+        };
+        resetLink.Click += (_, _) =>
+        {
+            apiKeyBox.Password = string.Empty;
+            baseUrlBox.Text = Config.DefaultLlmBaseUrl;
+            modelBox.Text = Config.DefaultLlmModel;
+            maxTokensBox.Value = Config.DefaultLlmMaxTokens;
+            timeoutBox.Value = Config.DefaultLlmTimeoutSeconds;
+        };
+        contentPanel.Children.Add(resetLink);
+
+        TextBlock errorText = new()
+        {
+            Foreground = new SolidColorBrush(Microsoft.UI.Colors.Red),
+            TextWrapping = TextWrapping.Wrap,
+            Visibility = Visibility.Collapsed,
+            Margin = new Thickness(0, 4, 0, 0),
+        };
+        contentPanel.Children.Add(errorText);
+
+        ScrollViewer scrollViewer = new()
+        {
+            Content = contentPanel,
+            VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+            MaxHeight = Math.Max(200, XamlRoot.Size.Height - 200),
+            Padding = new Thickness(0, 0, 16, 0),
+        };
+
+        ContentDialog dialog = new()
+        {
+            Title = Text.Localize("AI 设置"),
+            Content = scrollViewer,
+            PrimaryButtonText = Text.Localize("保存"),
+            CloseButtonText = Text.Localize("取消"),
+            DefaultButton = ContentDialogButton.Primary,
+            XamlRoot = XamlRoot,
+        };
+
+        dialog.PrimaryButtonClick += (_, args) =>
+        {
+            errorText.Visibility = Visibility.Collapsed;
+            try
+            {
+                Config.LlmApiKey = apiKeyBox.Password;
+                Config.LlmBaseUrl = string.IsNullOrWhiteSpace(baseUrlBox.Text)
+                    ? Config.DefaultLlmBaseUrl
+                    : baseUrlBox.Text;
+                Config.LlmModel = string.IsNullOrWhiteSpace(modelBox.Text)
+                    ? Config.DefaultLlmModel
+                    : modelBox.Text;
+                if (!double.IsNaN(maxTokensBox.Value) && maxTokensBox.Value > 0)
+                {
+                    Config.LlmMaxTokens = (int)maxTokensBox.Value;
+                }
+                if (!double.IsNaN(timeoutBox.Value) && timeoutBox.Value > 0)
+                {
+                    Config.LlmTimeoutSeconds = (int)timeoutBox.Value;
+                }
+            }
+            catch (Exception ex)
+            {
+                args.Cancel = true;
+                errorText.Text = ex.Message;
+                errorText.Visibility = Visibility.Visible;
+            }
+        };
+
+        return dialog;
     }
 
     #endregion

@@ -1,0 +1,159 @@
+name: Build MSIX Installer
+
+# 触发条件:
+#   - 推送到 main / copilot/** 分支时自动构建
+#   - 向 main 分支发起 PR 时自动构建
+#   - 支持在 Actions 页面手动触发
+on:
+  push:
+    branches:
+      - main
+      - 'copilot/**'
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+env:
+  CONFIGURATION: Release
+  PLATFORM: x64
+  # MSIX 输出目录（相对于仓库根目录）
+  APPX_DIR: AppPackages
+
+jobs:
+  build:
+    name: Build & Package (Windows x64)
+    runs-on: windows-latest
+
+    steps:
+      # ── 1. 检出代码 ──────────────────────────────────────────────────────────
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # ── 2. 配置 .NET 8 SDK ───────────────────────────────────────────────────
+      - name: Setup .NET SDK 8.0
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      # ── 3. 配置 MSBuild (Visual Studio 2022) ─────────────────────────────────
+      - name: Setup MSBuild
+        uses: microsoft/setup-msbuild@v2
+
+      # ── 4. 还原 NuGet 包 ──────────────────────────────────────────────────────
+      - name: Restore NuGet packages
+        run: dotnet restore RunOnce/RunOnce.csproj -p:Platform=${{ env.PLATFORM }}
+
+      # ── 5. 编译 C++ ShellExt.dll ──────────────────────────────────────────────
+      - name: Build ShellExt (C++ DLL, Release|x64)
+        run: >
+          msbuild ShellExt/ShellExt.vcxproj
+          /p:Configuration=${{ env.CONFIGURATION }}
+          /p:Platform=${{ env.PLATFORM }}
+          /m /nologo /verbosity:minimal
+
+      # ── 6. 生成自签名证书（主题必须与 Package.appxmanifest 中 Publisher 完全一致）─
+      - name: Generate self-signed signing certificate
+        shell: pwsh
+        run: |
+          $publisher = "CN=28B58DEE-3276-4667-848D-FC06656EFB1D"
+          $cert = New-SelfSignedCertificate `
+            -Type Custom `
+            -Subject $publisher `
+            -KeyUsage DigitalSignature `
+            -FriendlyName "RunOnce Self-Signed" `
+            -CertStoreLocation "Cert:\CurrentUser\My" `
+            -TextExtension @("2.5.29.37={text}1.3.6.1.5.5.7.3.3", "2.5.29.19={text}")
+
+          # 导出 PFX（供 MSBuild 签名使用）
+          $pfxPassword = ConvertTo-SecureString -String "RunOnce-CI" -Force -AsPlainText
+          Export-PfxCertificate `
+            -Cert "Cert:\CurrentUser\My\$($cert.Thumbprint)" `
+            -FilePath RunOnce/RunOnce_TemporaryKey.pfx `
+            -Password $pfxPassword
+
+          # 导出 .cer（供用户在安装前信任证书使用）
+          Export-Certificate `
+            -Cert "Cert:\CurrentUser\My\$($cert.Thumbprint)" `
+            -FilePath RunOnce_SideloadCert.cer `
+            -Type CERT
+
+          Write-Host "Certificate thumbprint: $($cert.Thumbprint)"
+
+      # ── 7. 编译并打包 MSIX ────────────────────────────────────────────────────
+      - name: Build and Package MSIX
+        shell: pwsh
+        run: |
+          $pfxPath = Join-Path $env:GITHUB_WORKSPACE "RunOnce/RunOnce_TemporaryKey.pfx"
+          msbuild RunOnce/RunOnce.csproj `
+            /p:Configuration=${{ env.CONFIGURATION }} `
+            /p:Platform=${{ env.PLATFORM }} `
+            /p:GenerateAppxPackageOnBuild=True `
+            /p:AppxPackageSigningEnabled=True `
+            /p:GenerateTemporaryStoreCertificate=False `
+            /p:PackageCertificateKeyFile="$pfxPath" `
+            /p:PackageCertificatePassword="RunOnce-CI" `
+            /p:AppxBundle=Never `
+            /p:UapAppxPackageBuildMode=SideloadOnly `
+            /p:AppxPackageDir="$env:GITHUB_WORKSPACE\${{ env.APPX_DIR }}\" `
+            /p:GenerateTestArtifacts=True `
+            /m /nologo /verbosity:minimal
+
+      # ── 8. 校验并列出构建产物（防止上传缺少 .msix 的空包）──────────────────────
+      - name: Validate and list package artifacts
+        shell: pwsh
+        run: |
+          $appxDir = "${{ env.APPX_DIR }}"
+          Write-Host "=== AppPackages ==="
+          Get-ChildItem -Recurse $appxDir -ErrorAction SilentlyContinue | Select-Object -ExpandProperty FullName
+          $msixFiles = Get-ChildItem -Recurse $appxDir -Filter *.msix -File -ErrorAction SilentlyContinue
+          if (-not $msixFiles) {
+            Write-Error "No .msix file found under $appxDir. Packaging did not produce an installer."
+            exit 1
+          }
+
+      # ── 9. 写入安装说明 ───────────────────────────────────────────────────────
+      - name: Write install instructions
+        shell: pwsh
+        run: |
+          $content = @"
+          # RunOnce 安装说明
+
+          ## 安装前提
+          RunOnce 以旁加载 (Sideload) 方式分发，安装前需先信任签名证书。
+
+          ## 安装步骤
+
+          ### 方法一：使用安装脚本（推荐）
+          1. 以**管理员**身份打开 PowerShell
+          2. 进入下载并解压后的文件夹
+          3. 运行：
+             \`\`\`powershell
+             Set-ExecutionPolicy Bypass -Scope Process
+             .\Add-AppDevPackage.ps1
+             \`\`\`
+          脚本会自动安装证书并完成应用安装。
+
+          ### 方法二：手动安装
+          1. 双击 **RunOnce_SideloadCert.cer**
+          2. 选择「安装证书」→「本地计算机」→「受信任的根证书颁发机构」→ 完成
+          3. 双击 **.msix** 文件，按提示完成安装
+
+          ## 系统要求
+          - Windows 11（版本 22000 或更高）
+          - 已安装 [Windows App Runtime](https://aka.ms/windowsappsdk) 1.8+
+          "@
+          $content | Out-File -FilePath INSTALL.md -Encoding utf8
+
+      # ── 10. 上传构建产物 ──────────────────────────────────────────────────────
+      - name: Upload MSIX artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: RunOnce-MSIX-${{ env.CONFIGURATION }}-${{ env.PLATFORM }}
+          path: |
+            ${{ env.APPX_DIR }}/**/*.msix
+            ${{ env.APPX_DIR }}/**/*.ps1
+            RunOnce_SideloadCert.cer
+            INSTALL.md
+          if-no-files-found: error
+          retention-days: 30

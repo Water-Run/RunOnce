@@ -9,6 +9,7 @@
 
 #nullable enable
 
+using System;
 using Microsoft.UI.Xaml;
 using RunOnce.Static;
 
@@ -42,6 +43,12 @@ public partial class App : Application
     public string LaunchArguments { get; private set; } = string.Empty;
 
     /// <summary>
+    /// 获取应用程序是否以 AI 生成模式启动。
+    /// </summary>
+    /// <value>当启动参数中包含 <c>--ai</c> 标志时为 true。</value>
+    public bool IsAiMode { get; private set; }
+
+    /// <summary>
     /// 初始化应用程序实例。
     /// </summary>
     public App()
@@ -58,7 +65,26 @@ public partial class App : Application
     /// </remarks>
     protected override void OnLaunched(LaunchActivatedEventArgs args)
     {
-        LaunchArguments = args.Arguments ?? string.Empty;
+        string rawArgs = args.Arguments ?? string.Empty;
+
+        // 检测并剥离 --ai 标志
+        const string aiFlag = " --ai";
+        if (rawArgs.EndsWith(aiFlag, StringComparison.OrdinalIgnoreCase))
+        {
+            IsAiMode = true;
+            LaunchArguments = rawArgs[..^aiFlag.Length].Trim();
+        }
+        else if (rawArgs.Equals("--ai", StringComparison.OrdinalIgnoreCase))
+        {
+            IsAiMode = true;
+            LaunchArguments = string.Empty;
+        }
+        else
+        {
+            IsAiMode = false;
+            LaunchArguments = rawArgs;
+        }
+
         _mainWindow = new MainWindow();
         ApplyTheme(Config.Theme);
         _mainWindow.Activate();
