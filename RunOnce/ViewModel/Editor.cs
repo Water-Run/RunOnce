@@ -4,7 +4,7 @@
  *
  * @author: WaterRun
  * @file: ViewModel/Editor.cs
- * @date: 2026-03-19
+ * @date: 2026-03-24
  */
 
 #nullable enable
@@ -17,6 +17,11 @@ using System.Linq;
 using System.Runtime.CompilerServices;
 using RunOnce.Static;
 
+/// <summary>
+/// 代码编辑器页面相关 ViewModel 的语义边界，提供编辑器状态管理与执行调度能力。
+/// 文件职责：管理编辑器页面的光标位置、语言检测结果、命令行参数与执行逻辑。
+/// 作者：WaterRun；最后修改：2026-03-24。
+/// </summary>
 namespace RunOnce.ViewModel;
 
 /// <summary>
@@ -30,77 +35,80 @@ namespace RunOnce.ViewModel;
 public sealed class EditorViewModel : INotifyPropertyChanged
 {
     /// <summary>
-    /// 当前光标所在行号。
+    /// 当前光标行号的后备存储；由 <see cref="UpdateCursorPosition"/> 更新；生命周期与实例相同；非只读，非缓存，需在 UI 线程访问。
     /// </summary>
     private int _currentLine = 1;
 
     /// <summary>
-    /// 当前光标所在列号。
+    /// 当前光标列号的后备存储；由 <see cref="UpdateCursorPosition"/> 更新；生命周期与实例相同；非只读，非缓存，需在 UI 线程访问。
     /// </summary>
     private int _currentColumn = 1;
 
     /// <summary>
-    /// 自动检测到的语言标识符。
+    /// 自动检测到的语言标识符的后备存储；由 <see cref="RunDetection"/> 写入；空字符串表示未检测到；生命周期与实例相同；非只读，非缓存，需在 UI 线程访问。
     /// </summary>
     private string _detectedLanguage = string.Empty;
 
     /// <summary>
-    /// 自动检测到的最高置信度。
+    /// 自动检测到的最高置信度的后备存储；由 <see cref="RunDetection"/> 写入；范围 [0, 1]，0 表示未检测到或初始状态；生命周期与实例相同；非只读，非缓存，需在 UI 线程访问。
     /// </summary>
     private double _detectedConfidence;
 
     /// <summary>
-    /// 所有语言的检测结果列表。
+    /// 所有语言检测结果列表的后备存储；由 <see cref="RunDetection"/> 写入；生命周期与实例相同；非只读，非缓存，需在 UI 线程访问。
     /// </summary>
     private IReadOnlyList<DetectionResult> _detectionResults = [];
 
     /// <summary>
-    /// 用户手动指定的语言标识符，为 null 表示使用自动检测结果。
+    /// 用户手动指定的语言标识符的后备存储；null 表示使用自动检测结果；生命周期与实例相同；非只读，可为 null，需在 UI 线程访问。
     /// </summary>
     private string? _manualLanguage;
 
     /// <summary>
-    /// 用户输入的命令行参数，仅在内存中保持，不持久化存储。
+    /// 命令行参数字符串的后备存储；仅保存于内存中，不持久化；生命周期与实例相同；非只读，非缓存，需在 UI 线程访问。
     /// </summary>
     private string _commandLineArguments = string.Empty;
 
-    /// <summary>
-    /// 属性值变更时触发的事件。
-    /// </summary>
+    /// <summary>属性值变更时触发，用于通知绑定层刷新对应 UI。</summary>
+    /// <remarks>
+    /// 触发时机：任意受监控属性的后备字段值发生变化时，由 <see cref="SetProperty{T}"/> 或 <see cref="OnPropertyChanged"/> 在同一调用栈上同步触发。
+    /// 线程上下文：仅在 UI 线程触发，不跨线程。
+    /// 重入：非可重入，不建议在处理程序内修改同一 ViewModel 属性。
+    /// 订阅/取消订阅：由数据绑定框架自动管理；手动订阅者需在不再使用时取消订阅以避免内存泄漏。
+    /// </remarks>
     public event PropertyChangedEventHandler? PropertyChanged;
 
     #region 光标位置属性
 
-    /// <summary>
-    /// 获取当前光标所在行号（从 1 开始）。
-    /// </summary>
+    /// <summary>获取当前光标所在行号（从 1 开始）。</summary>
+    /// <value>行号整数，最小值为 1；默认值为 1；只读（仅由 <see cref="UpdateCursorPosition"/> 间接更新）；非延迟计算。</value>
     public int CurrentLine
     {
         get => _currentLine;
         private set => SetProperty(ref _currentLine, value);
     }
 
-    /// <summary>
-    /// 获取当前光标所在列号（从 1 开始）。
-    /// </summary>
+    /// <summary>获取当前光标所在列号（从 1 开始）。</summary>
+    /// <value>列号整数，最小值为 1；默认值为 1；只读（仅由 <see cref="UpdateCursorPosition"/> 间接更新）；非延迟计算。</value>
     public int CurrentColumn
     {
         get => _currentColumn;
         private set => SetProperty(ref _currentColumn, value);
     }
 
-    /// <summary>
-    /// 获取本地化的光标位置显示文本。
-    /// </summary>
+    /// <summary>获取本地化的光标位置显示文本。</summary>
+    /// <value>格式为"行 N, 列 M"的本地化字符串；每次访问时重新计算；不允许为 null。</value>
     public string PositionDisplay => $"{Text.Localize("行")} {_currentLine}, {Text.Localize("列")} {_currentColumn}";
 
     #endregion
 
     #region 语言检测属性
 
-    /// <summary>
-    /// 获取语言检测结果的本地化显示文本。
-    /// </summary>
+    /// <summary>获取语言检测结果的本地化显示文本。</summary>
+    /// <value>
+    /// 手动指定时返回大写语言标识；检测成功时返回"语言 (置信度%)"格式；
+    /// 未检测到时返回本地化"纯文本"；每次访问时重新计算；不允许为 null。
+    /// </value>
     public string DetectedLanguageDisplay
     {
         get
@@ -119,29 +127,24 @@ public sealed class EditorViewModel : INotifyPropertyChanged
         }
     }
 
-    /// <summary>
-    /// 获取当前生效的语言标识符。
-    /// </summary>
+    /// <summary>获取当前生效的语言标识符。</summary>
+    /// <value>若已手动指定则返回手动值，否则返回自动检测值；可为空字符串（未检测到时）；不允许为 null；每次访问时重新计算。</value>
     public string EffectiveLanguage => !string.IsNullOrEmpty(_manualLanguage) ? _manualLanguage : _detectedLanguage;
 
-    /// <summary>
-    /// 获取自动检测的最高置信度。
-    /// </summary>
+    /// <summary>获取自动检测的最高置信度。</summary>
+    /// <value>浮点数，范围 [0, 1]；0 表示未检测到或初始状态；默认值为 0；只读。</value>
     public double DetectedConfidence => _detectedConfidence;
 
-    /// <summary>
-    /// 获取所有语言的检测结果列表。
-    /// </summary>
+    /// <summary>获取所有语言的检测结果列表。</summary>
+    /// <value>按置信度降序排列的只读结果列表；默认为空列表；不允许为 null；只读。</value>
     public IReadOnlyList<DetectionResult> DetectionResults => _detectionResults;
 
-    /// <summary>
-    /// 获取当前检测结果是否达到可信标准。
-    /// </summary>
+    /// <summary>获取当前检测结果是否达到可信标准。</summary>
+    /// <value>当 <see cref="DetectedConfidence"/> 大于等于 <see cref="Config.ConfidenceThreshold"/> 时为 true；每次访问时重新计算。</value>
     public bool IsConfident => _detectedConfidence >= Config.ConfidenceThreshold;
 
-    /// <summary>
-    /// 根据配置判断执行前是否应显示语言选择框。
-    /// </summary>
+    /// <summary>根据配置判断执行前是否应显示语言选择框。</summary>
+    /// <value>true 表示应显示语言选择框；由 <see cref="Config.SelectorMode"/> 与检测结果共同决定；每次访问时重新计算。</value>
     public bool ShouldShowLanguageSelector => Config.SelectorMode switch
     {
         LanguageSelectorMode.AlwaysShow => true,
@@ -149,9 +152,8 @@ public sealed class EditorViewModel : INotifyPropertyChanged
         _ => true,
     };
 
-    /// <summary>
-    /// 获取或设置用户手动指定的语言标识符。
-    /// </summary>
+    /// <summary>获取或设置用户手动指定的语言标识符。</summary>
+    /// <value>null 表示使用自动检测结果；非 null 时优先于自动检测；默认值为 null；允许为 null。</value>
     public string? ManualLanguage
     {
         get => _manualLanguage;
@@ -169,9 +171,8 @@ public sealed class EditorViewModel : INotifyPropertyChanged
 
     #region 命令行参数
 
-    /// <summary>
-    /// 获取或设置传递给脚本的命令行参数。
-    /// </summary>
+    /// <summary>获取或设置传递给脚本的命令行参数。</summary>
+    /// <value>参数字符串；null 赋值自动替换为空字符串；默认值为空字符串；仅保存于内存中，不持久化；不允许为 null。</value>
     public string CommandLineArguments
     {
         get => _commandLineArguments;
@@ -184,18 +185,16 @@ public sealed class EditorViewModel : INotifyPropertyChanged
         }
     }
 
-    /// <summary>
-    /// 获取当前是否已设置非空的命令行参数。
-    /// </summary>
+    /// <summary>获取当前是否已设置非空的命令行参数。</summary>
+    /// <value>true 表示 <see cref="CommandLineArguments"/> 非空白；每次访问时重新计算。</value>
     public bool HasCommandLineArguments => !string.IsNullOrWhiteSpace(_commandLineArguments);
 
     #endregion
 
     #region 工作目录
 
-    /// <summary>
-    /// 获取或设置脚本执行的工作目录。
-    /// </summary>
+    /// <summary>获取或设置脚本执行的工作目录。</summary>
+    /// <value>目录路径字符串；不允许为 null；默认值为 <see cref="Environment.CurrentDirectory"/>。</value>
     public string WorkingDirectory { get; set; } = Environment.CurrentDirectory;
 
     #endregion
@@ -205,8 +204,8 @@ public sealed class EditorViewModel : INotifyPropertyChanged
     /// <summary>
     /// 根据文本和字符偏移量更新光标行列信息。
     /// </summary>
-    /// <param name="text">RichEditBox 中的原始文本（\r 作为换行符），允许为 null 或空。</param>
-    /// <param name="charIndex">光标的字符偏移量，允许为负数（将视为无效并重置为初始位置）。</param>
+    /// <param name="text">RichEditBox 中的原始文本（\r 作为换行符）；允许为 null 或空（将重置为初始位置）。</param>
+    /// <param name="charIndex">光标的字符偏移量；允许为负数（将视为无效并重置为初始位置）；超出文本长度时截断至末尾。</param>
     public void UpdateCursorPosition(string text, int charIndex)
     {
         if (string.IsNullOrEmpty(text) || charIndex < 0)
@@ -242,7 +241,7 @@ public sealed class EditorViewModel : INotifyPropertyChanged
     /// <summary>
     /// 对代码执行渐进式语言检测并更新所有相关属性。
     /// </summary>
-    /// <param name="code">待检测的代码文本（已规范化为 \n 换行），允许为 null 或空。</param>
+    /// <param name="code">待检测的代码文本（已规范化为 \n 换行）；允许为 null 或空白（将重置检测结果为零置信度）。</param>
     /// <remarks>
     /// 渐进式策略：从前 N 个字符开始检测，若置信度超过阈值则提前停止，
     /// 否则逐步扩大分析范围直至达到最大字符数限制。
@@ -309,8 +308,8 @@ public sealed class EditorViewModel : INotifyPropertyChanged
     /// <summary>
     /// 执行代码脚本，附带可选的命令行参数。
     /// </summary>
-    /// <param name="code">待执行的代码文本，不允许为 null。</param>
-    /// <param name="language">目标语言标识符，不允许为 null 或空字符串。</param>
+    /// <param name="code">待执行的代码文本；不允许为 null；允许为空白字符串（将提前返回，不执行）；内部将规范化换行符为 \r\n。</param>
+    /// <param name="language">目标语言标识符；不允许为 null；允许为空字符串（将提前返回）；应为 <see cref="Config"/> 支持的有效语言标识。</param>
     /// <exception cref="ArgumentNullException">当 code 或 language 为 null 时抛出。</exception>
     /// <exception cref="ArgumentException">当参数为空白字符串或语言不在支持列表中时抛出。</exception>
     /// <exception cref="IOException">当临时文件创建失败时抛出。</exception>
@@ -365,11 +364,19 @@ public sealed class EditorViewModel : INotifyPropertyChanged
 
     #region INotifyPropertyChanged 实现
 
+    /// <summary>触发指定属性名的 <see cref="PropertyChanged"/> 事件，通知绑定层刷新对应 UI。</summary>
+    /// <param name="propertyName">属性名称；由编译器通过 <see cref="CallerMemberNameAttribute"/> 自动填充；允许为 null（将触发 null 名称的通知，通常表示所有属性均已变更）。</param>
     private void OnPropertyChanged([CallerMemberName] string? propertyName = null)
     {
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
     }
 
+    /// <summary>比较后备字段当前值与新值，若不相等则写入新值并触发属性变更通知。</summary>
+    /// <typeparam name="T">后备字段与值的类型；需支持 <see cref="EqualityComparer{T}.Default"/> 的相等比较语义。</typeparam>
+    /// <param name="field">后备字段的引用；由此方法直接写入新值。</param>
+    /// <param name="value">待写入的新值；可为任意 T 类型值（含 null，若 T 为可空类型）。</param>
+    /// <param name="propertyName">属性名称；由编译器通过 <see cref="CallerMemberNameAttribute"/> 自动填充；允许为 null。</param>
+    /// <returns>若字段值实际发生变化则返回 true；字段值未变化则返回 false。</returns>
     private bool SetProperty<T>(ref T field, T value, [CallerMemberName] string? propertyName = null)
     {
         if (EqualityComparer<T>.Default.Equals(field, value))

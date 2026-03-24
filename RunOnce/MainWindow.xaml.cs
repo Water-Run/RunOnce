@@ -226,9 +226,9 @@ public sealed partial class MainWindow : Window
         if (ContentFrame.Content is Editor editor)
         {
             // 处理来自设置页面的编辑器清空请求（性能策略切换时触发）
-            if (Settings._pendingEditorClear)
+            if (Settings.PendingEditorClear)
             {
-                Settings._pendingEditorClear = false;
+                Settings.PendingEditorClear = false;
                 editor.ClearAllContent();
             }
 
