@@ -4,7 +4,7 @@
  *
  * @author: WaterRun
  * @file: MainWindow.xaml.cs
- * @date: 2026-03-19
+ * @date: 2026-03-24
  */
 
 #nullable enable
@@ -201,7 +201,7 @@ public sealed partial class MainWindow : Window
         Title = appName;
         AppTitleTextBlock.Text = appName;
         ToolTipService.SetToolTip(ArgsButton, $"{Text.Localize("命令行参数")} (Ctrl+E)");
-        ToolTipService.SetToolTip(AiButton, $"{Text.Localize("AI 生成代码")} (Ctrl+G)");
+        ToolTipService.SetToolTip(AiButton, $"{Text.Localize("大模型生成代码")} (Ctrl+L)");
         ToolTipService.SetToolTip(RunButton, $"{Text.Localize("运行")} (Ctrl+Enter)");
     }
 

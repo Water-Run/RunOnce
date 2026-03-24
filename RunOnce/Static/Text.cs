@@ -4,7 +4,7 @@
  *
  * @author: WaterRun
  * @file: Static/Text.cs
- * @date: 2026-03-19
+ * @date: 2026-03-24
  */
 
 #nullable enable
@@ -185,14 +185,14 @@ public static class Text
         ["无法启动终端进程。"] = "Failed to start terminal process.",
 
         // LLM 功能
-        ["AI 设置"] = "AI Settings",
+        ["大模型设置"] = "Model Settings",
         ["配置 LLM API 以生成脚本代码"] = "Configure LLM API to generate script code",
-        ["AI 生成代码"] = "AI Generate Code",
+        ["大模型生成代码"] = "Model Generate Code",
         ["描述你的需求"] = "Describe your requirements",
         ["例如：列出当前目录下所有.txt文件"] = "e.g.: List all .txt files in current directory",
         ["生成"] = "Generate",
         ["自动"] = "Auto",
-        ["AI 生成"] = "AI Generate",
+        ["大模型生成"] = "Model Generate",
         ["正在生成..."] = "Generating...",
 
         // LLM 设置对话框

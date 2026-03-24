@@ -4,7 +4,7 @@
  *
  * @author: WaterRun
  * @file: Static/Config.cs
- * @date: 2026-03-19
+ * @date: 2026-03-24
  */
 
 #nullable enable
@@ -156,7 +156,7 @@ public static class Config
 
     /// <summary>软件的当前版本号。</summary>
     /// <value>遵循语义化版本规范，格式为 Major.Minor.Patch。</value>
-    public const string Version = "1.1.0";
+    public const string Version = "1.2.0";
 
     /// <summary>软件作者名称。</summary>
     /// <value>固定值 "WaterRun"。</value>

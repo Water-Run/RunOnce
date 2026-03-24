@@ -4,7 +4,7 @@
  *
  * @author: WaterRun
  * @file: View/Settings.xaml.cs
- * @date: 2026-03-19
+ * @date: 2026-03-24
  */
 
 #nullable enable
@@ -212,7 +212,7 @@ public sealed partial class Settings : Page
         AdvancedSettingsLabel.Text = Text.Localize("高级设置");
         AdvancedSettingsDescription.Text = Text.Localize("配置临时文件、置信度阈值和语言命令");
         AdvancedSettingsButton.Content = Text.Localize("打开");
-        AiSettingsLabel.Text = Text.Localize("AI 设置");
+        AiSettingsLabel.Text = Text.Localize("大模型设置");
         AiSettingsDescription.Text = Text.Localize("配置 LLM API 以生成脚本代码");
         AiSettingsButton.Content = Text.Localize("打开");
 
@@ -265,7 +265,7 @@ public sealed partial class Settings : Page
         StackPanel panel = new() { Spacing = 8, MinWidth = 380 };
 
         AddShortcutRow(panel, "Ctrl+Enter", Text.Localize("执行代码"));
-        AddShortcutRow(panel, "Ctrl+G", Text.Localize("AI 生成代码"));
+        AddShortcutRow(panel, "Ctrl+L", Text.Localize("大模型生成代码"));
         AddShortcutRow(panel, "Ctrl+E", Text.Localize("命令行参数"));
         AddShortcutRow(panel, "Ctrl+Y", Text.Localize("重做"));
         AddShortcutRow(panel, "Ctrl+A", Text.Localize("全选"));
@@ -599,7 +599,7 @@ public sealed partial class Settings : Page
 
         ContentDialog dialog = new()
         {
-            Title = Text.Localize("AI 设置"),
+            Title = Text.Localize("大模型设置"),
             Content = scrollViewer,
             PrimaryButtonText = Text.Localize("保存"),
             CloseButtonText = Text.Localize("取消"),

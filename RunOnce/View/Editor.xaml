@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
     @file: View/Editor.xaml
-    @date: 2026-03-11
+    @date: 2026-03-24
 -->
 <Page
     x:Class="RunOnce.View.Editor"
@@ -14,25 +14,40 @@
     NavigationCacheMode="Required">
 
     <Page.Resources>
-        <SolidColorBrush x:Key="TextControlBackground" Color="Transparent"/>
-        <SolidColorBrush x:Key="TextControlBackgroundPointerOver" Color="Transparent"/>
-        <SolidColorBrush x:Key="TextControlBackgroundFocused" Color="Transparent"/>
-        <SolidColorBrush x:Key="TextControlBackgroundReadOnly" Color="Transparent"/>
-        <SolidColorBrush x:Key="TextControlBackgroundDisabled" Color="Transparent"/>
+        <SolidColorBrush x:Key="TextControlBackground"
+                         Color="Transparent"/>
+        <SolidColorBrush x:Key="TextControlBackgroundPointerOver"
+                         Color="Transparent"/>
+        <SolidColorBrush x:Key="TextControlBackgroundFocused"
+                         Color="Transparent"/>
+        <SolidColorBrush x:Key="TextControlBackgroundReadOnly"
+                         Color="Transparent"/>
+        <SolidColorBrush x:Key="TextControlBackgroundDisabled"
+                         Color="Transparent"/>
 
-        <SolidColorBrush x:Key="TextControlBorderBrush" Color="Transparent"/>
-        <SolidColorBrush x:Key="TextControlBorderBrushPointerOver" Color="Transparent"/>
-        <SolidColorBrush x:Key="TextControlBorderBrushFocused" Color="Transparent"/>
-        <SolidColorBrush x:Key="TextControlBorderBrushDisabled" Color="Transparent"/>
+        <SolidColorBrush x:Key="TextControlBorderBrush"
+                         Color="Transparent"/>
+        <SolidColorBrush x:Key="TextControlBorderBrushPointerOver"
+                         Color="Transparent"/>
+        <SolidColorBrush x:Key="TextControlBorderBrushFocused"
+                         Color="Transparent"/>
+        <SolidColorBrush x:Key="TextControlBorderBrushDisabled"
+                         Color="Transparent"/>
 
         <Thickness x:Key="TextControlBorderThemeThickness">0</Thickness>
         <Thickness x:Key="TextControlBorderThemeThicknessFocused">0</Thickness>
     </Page.Resources>
 
     <Page.KeyboardAccelerators>
-        <KeyboardAccelerator Key="Enter" Modifiers="Control" Invoked="ExecuteAccelerator_Invoked"/>
-        <KeyboardAccelerator Key="E" Modifiers="Control" Invoked="ArgsAccelerator_Invoked"/>
-        <KeyboardAccelerator Key="G" Modifiers="Control" Invoked="AiGenerateAccelerator_Invoked"/>
+        <KeyboardAccelerator Key="Enter"
+                             Modifiers="Control"
+                             Invoked="ExecuteAccelerator_Invoked"/>
+        <KeyboardAccelerator Key="E"
+                             Modifiers="Control"
+                             Invoked="ArgsAccelerator_Invoked"/>
+        <KeyboardAccelerator Key="L"
+                             Modifiers="Control"
+                             Invoked="AiGenerateAccelerator_Invoked"/>
     </Page.KeyboardAccelerators>
 
     <Grid Background="Transparent">

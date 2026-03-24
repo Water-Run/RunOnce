@@ -4,7 +4,7 @@
  *
  * @author: WaterRun
  * @file: View/Editor.xaml.cs
- * @date: 2026-03-19
+ * @date: 2026-03-24
  */
 
 #nullable enable
@@ -355,9 +355,9 @@ public sealed partial class Editor : Page
 
         MenuFlyoutItem aiItem = new()
         {
-            Text = Text.Localize("AI 生成"),
+            Text = Text.Localize("大模型生成"),
             Icon = new FontIcon { FontFamily = new FontFamily("Segoe MDL2 Assets"), Glyph = "\xE82F" },
-            KeyboardAcceleratorTextOverride = "Ctrl+G",
+            KeyboardAcceleratorTextOverride = "Ctrl+L",
         };
         aiItem.Click += (_, _) => _ = HandleAiGenerateAsync();
         flyout.Items.Add(aiItem);
@@ -644,7 +644,7 @@ public sealed partial class Editor : Page
                 return;
             }
 
-            if (e.Key == VirtualKey.G)
+            if (e.Key == VirtualKey.L)
             {
                 e.Handled = true;
                 _ = HandleAiGenerateAsync();
@@ -1051,7 +1051,7 @@ public sealed partial class Editor : Page
         // ── 构建对话框 ──
         ContentDialog dialog = new()
         {
-            Title = Text.Localize("AI 生成代码"),
+            Title = Text.Localize("大模型生成代码"),
             Content = contentPanel,
             PrimaryButtonText = Text.Localize("生成"),
             CloseButtonText = Text.Localize("取消"),

@@ -13,7 +13,7 @@
   <Identity
     Name="WaterRun.69938B914C94"
     Publisher="CN=28B58DEE-3276-4667-848D-FC06656EFB1D"
-    Version="1.1.0.0" />
+    Version="1.2.0.0" />
 
   <mp:PhoneIdentity PhoneProductId="f0fa32ca-7e6d-4e7d-8047-57fa88e31aa6" PhonePublisherId="00000000-0000-0000-0000-000000000000" />
 
@@ -55,10 +55,6 @@
                 Id="D4E5F601-A2B3-4C5D-8E9F-0A1B2C3D4E5F"
                 Path="ShellExt.dll"
                 ThreadingModel="STA" />
-              <com:Class
-                Id="E1C5F602-A3B4-5C6D-9E0F-1A2B3C4D5E6F"
-                Path="ShellExt.dll"
-                ThreadingModel="STA" />
             </com:SurrogateServer>
           </com:ComServer>
         </com:Extension>
@@ -69,9 +65,6 @@
               <desktop5:Verb
                 Id="RunOnceHere"
                 Clsid="D4E5F601-A2B3-4C5D-8E9F-0A1B2C3D4E5F" />
-              <desktop5:Verb
-                Id="RunOnceAiHere"
-                Clsid="E1C5F602-A3B4-5C6D-9E0F-1A2B3C4D5E6F" />
             </desktop5:ItemType>
           </desktop4:FileExplorerContextMenus>
         </desktop4:Extension>
