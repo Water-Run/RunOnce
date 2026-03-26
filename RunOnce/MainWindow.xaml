@@ -70,15 +70,15 @@
                 </Grid>
             </Button>
 
-            <!-- AI 生成按钮 -->
+            <!-- LLM 生成按钮 -->
             <Button
-                x:Name="AiButton"
+                x:Name="LlmButton"
                 Grid.Column="3"
                 Style="{ThemeResource SubtleButtonStyle}"
                 Width="48"
                 Height="48"
                 Visibility="Visible"
-                Click="AiButton_Click">
+                Click="LlmButton_Click">
                 <FontIcon FontFamily="{ThemeResource SymbolThemeFontFamily}" Glyph="&#xE82F;" FontSize="14"/>
             </Button>
 

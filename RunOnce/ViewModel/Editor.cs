@@ -19,19 +19,12 @@ using RunOnce.Static;
 
 /// <summary>
 /// 代码编辑器页面相关 ViewModel 的语义边界，提供编辑器状态管理与执行调度能力。
-/// 文件职责：管理编辑器页面的光标位置、语言检测结果、命令行参数与执行逻辑。
-/// 作者：WaterRun；最后修改：2026-03-24。
 /// </summary>
 namespace RunOnce.ViewModel;
 
 /// <summary>
 /// 代码编辑器页面的 ViewModel，承载光标位置、语言检测结果、命令行参数与执行状态。
 /// </summary>
-/// <remarks>
-/// 不变量：代码文本由 View 层的 RichEditBox 管理，本类仅持有检测与光标等派生状态。
-/// 线程安全：非线程安全，所有成员必须在 UI 线程访问。
-/// 副作用：<see cref="Execute"/> 会创建临时文件并启动外部终端进程。
-/// </remarks>
 public sealed class EditorViewModel : INotifyPropertyChanged
 {
     /// <summary>
@@ -70,12 +63,6 @@ public sealed class EditorViewModel : INotifyPropertyChanged
     private string _commandLineArguments = string.Empty;
 
     /// <summary>属性值变更时触发，用于通知绑定层刷新对应 UI。</summary>
-    /// <remarks>
-    /// 触发时机：任意受监控属性的后备字段值发生变化时，由 <see cref="SetProperty{T}"/> 或 <see cref="OnPropertyChanged"/> 在同一调用栈上同步触发。
-    /// 线程上下文：仅在 UI 线程触发，不跨线程。
-    /// 重入：非可重入，不建议在处理程序内修改同一 ViewModel 属性。
-    /// 订阅/取消订阅：由数据绑定框架自动管理；手动订阅者需在不再使用时取消订阅以避免内存泄漏。
-    /// </remarks>
     public event PropertyChangedEventHandler? PropertyChanged;
 
     #region 光标位置属性

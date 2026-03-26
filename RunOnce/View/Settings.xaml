@@ -210,17 +210,17 @@
                     <Button x:Name="AdvancedSettingsButton" Grid.Column="1" VerticalAlignment="Center" Click="AdvancedSettingsButton_Click"/>
                 </Grid>
 
-                <!-- AI 设置 -->
+                <!-- LLM 设置 -->
                 <Grid Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1,0,1,1" CornerRadius="0,0,4,4" Padding="16,12,16,12" MinHeight="52">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*"/>
                         <ColumnDefinition Width="Auto"/>
                     </Grid.ColumnDefinitions>
                     <StackPanel Grid.Column="0" VerticalAlignment="Center">
-                        <TextBlock x:Name="AiSettingsLabel" Style="{ThemeResource BodyTextBlockStyle}"/>
-                        <TextBlock x:Name="AiSettingsDescription" Style="{ThemeResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+                        <TextBlock x:Name="LlmSettingsLabel" Style="{ThemeResource BodyTextBlockStyle}"/>
+                        <TextBlock x:Name="LlmSettingsDescription" Style="{ThemeResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
                     </StackPanel>
-                    <Button x:Name="AiSettingsButton" Grid.Column="1" VerticalAlignment="Center" Click="AiSettingsButton_Click"/>
+                    <Button x:Name="LlmSettingsButton" Grid.Column="1" VerticalAlignment="Center" Click="LlmSettingsButton_Click"/>
                 </Grid>
 
                 <!-- ====== 窄屏关于区域 ====== -->

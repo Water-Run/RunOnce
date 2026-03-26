@@ -4,7 +4,7 @@
  *
  * @author: WaterRun
  * @file: MainWindow.xaml.cs
- * @date: 2026-03-24
+ * @date: 2026-03-26
  */
 
 #nullable enable
@@ -201,7 +201,7 @@ public sealed partial class MainWindow : Window
         Title = appName;
         AppTitleTextBlock.Text = appName;
         ToolTipService.SetToolTip(ArgsButton, $"{Text.Localize("命令行参数")} (Ctrl+E)");
-        ToolTipService.SetToolTip(AiButton, $"{Text.Localize("大模型生成代码")} (Ctrl+L)");
+        ToolTipService.SetToolTip(LlmButton, $"{Text.Localize("大模型生成代码")} (Ctrl+L)");
         ToolTipService.SetToolTip(RunButton, $"{Text.Localize("运行")} (Ctrl+Enter)");
     }
 
@@ -264,7 +264,7 @@ public sealed partial class MainWindow : Window
     {
         BackButton.Visibility = _isInSettingsPage ? Visibility.Visible : Visibility.Collapsed;
         ArgsButton.Visibility = _isInSettingsPage ? Visibility.Collapsed : Visibility.Visible;
-        AiButton.Visibility = _isInSettingsPage ? Visibility.Collapsed : Visibility.Visible;
+        LlmButton.Visibility = _isInSettingsPage ? Visibility.Collapsed : Visibility.Visible;
         RunButton.Visibility = _isInSettingsPage ? Visibility.Collapsed : Visibility.Visible;
         SettingsButton.Visibility = _isInSettingsPage ? Visibility.Collapsed : Visibility.Visible;
     }
@@ -293,15 +293,15 @@ public sealed partial class MainWindow : Window
     }
 
     /// <summary>
-    /// AI 生成按钮点击事件处理程序。
+    /// LLM 生成按钮点击事件处理程序。
     /// </summary>
     /// <param name="sender">事件源对象。</param>
     /// <param name="e">路由事件参数。</param>
-    private async void AiButton_Click(object sender, RoutedEventArgs e)
+    private async void LlmButton_Click(object sender, RoutedEventArgs e)
     {
         if (ContentFrame.Content is Editor editorPage)
         {
-            await editorPage.HandleAiGenerateAsync();
+            await editorPage.HandleLlmGenerateAsync();
         }
     }
 

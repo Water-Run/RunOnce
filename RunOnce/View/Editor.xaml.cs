@@ -4,7 +4,7 @@
  *
  * @author: WaterRun
  * @file: View/Editor.xaml.cs
- * @date: 2026-03-24
+ * @date: 2026-03-26
  */
 
 #nullable enable
@@ -49,22 +49,23 @@ namespace RunOnce.View;
 public sealed partial class Editor : Page
 {
     /// <summary>
-    /// 自动检测的语言选择标识，区别于实际语言标识符。
+    /// 自动检测的语言选择标识，使用空字符前缀区别于实际语言标识符。
     /// </summary>
     private const string AutoDetectToken = "\0auto";
 
     /// <summary>
     /// 编辑器页面的 ViewModel 实例。
     /// </summary>
+    /// <value>在构造函数中创建，生命周期与页面一致，不为 null。</value>
     public EditorViewModel ViewModel { get; }
 
     /// <summary>
-    /// 高亮与检测的去抖定时器。
+    /// 高亮与检测的去抖定时器，80ms 间隔、单次触发。
     /// </summary>
     private DispatcherQueueTimer? _updateTimer;
 
     /// <summary>
-    /// 滚动事件的去抖定时器，滚动停止后重新应用视窗高亮。
+    /// 滚动事件的去抖定时器，滚动停止后重新应用视窗高亮，50ms 间隔、单次触发。
     /// </summary>
     private DispatcherQueueTimer? _scrollTimer;
 
@@ -79,42 +80,42 @@ public sealed partial class Editor : Page
     private bool _isExecuting;
 
     /// <summary>
-    /// 标识当前是否展现限制对话框。
+    /// 标识当前是否展现字符数限制对话框，防止重复弹出。
     /// </summary>
     private bool _isShowingLimitDialog;
 
     /// <summary>
-    /// 标识当前是否处于鼠标拖动选区过程。
+    /// 标识当前是否处于鼠标拖动选区过程，拖动期间暂停高亮。
     /// </summary>
     private bool _isPointerSelecting;
 
     /// <summary>
-    /// 标识是否在拖动结束后补做一次高亮。
+    /// 标识是否在拖动结束后需要补做一次高亮。
     /// </summary>
     private bool _pendingHighlightAfterPointerRelease;
 
     /// <summary>
-    /// 标识当前是否正在通过 AI 生成代码，防止重入。
+    /// 标识当前是否正在通过 LLM 生成代码，防止重入。
     /// </summary>
-    private bool _isAiGenerating;
+    private bool _isLlmGenerating;
 
     /// <summary>
-    /// RichEditBox 内部 ScrollViewer 的缓存引用，在页面加载时获取。
+    /// RichEditBox 内部 ScrollViewer 的缓存引用，在页面加载时通过可视树查找获取。
     /// </summary>
     private ScrollViewer? _scrollViewer;
 
     /// <summary>
-    /// 上次高亮应用的视窗范围起始位置，用于判断是否需要重新高亮。
+    /// 上次高亮应用的视窗范围起始位置，-1 表示缓存已失效。
     /// </summary>
     private int _lastHighlightRangeStart = -1;
 
     /// <summary>
-    /// 上次高亮应用的视窗范围结束位置，用于判断是否需要重新高亮。
+    /// 上次高亮应用的视窗范围结束位置，-1 表示缓存已失效。
     /// </summary>
     private int _lastHighlightRangeEnd = -1;
 
     /// <summary>
-    /// 初始化编辑器页面实例。
+    /// 初始化编辑器页面实例，创建 ViewModel 并注册页面级事件。
     /// </summary>
     public Editor()
     {
@@ -125,8 +126,10 @@ public sealed partial class Editor : Page
     }
 
     /// <summary>
-    /// 处理页面加载完成事件。
+    /// 处理页面加载完成事件，完成定时器、滚动监听、右键菜单等初始化工作。
     /// </summary>
+    /// <param name="sender">事件源。</param>
+    /// <param name="e">事件参数。</param>
     private void OnPageLoaded(object sender, RoutedEventArgs e)
     {
         EnsureTimerInitialized();
@@ -138,16 +141,17 @@ public sealed partial class Editor : Page
         UpdatePlaceholderVisibility();
         CodeEditor.Focus(FocusState.Programmatic);
 
-        // 若以 AI 模式启动，自动打开 AI 生成对话框
-        if (Application.Current is App { IsAiMode: true })
+        if (Application.Current is App { IsLlmMode: true })
         {
-            _ = HandleAiGenerateAsync();
+            _ = HandleLlmGenerateAsync();
         }
     }
 
     /// <summary>
     /// 处理实际主题变更事件，重新应用高亮以更新颜色。
     /// </summary>
+    /// <param name="sender">事件源。</param>
+    /// <param name="args">事件参数。</param>
     private void OnActualThemeChanged(FrameworkElement sender, object args)
     {
         if (_isPointerSelecting)
@@ -163,7 +167,7 @@ public sealed partial class Editor : Page
     #region 初始化
 
     /// <summary>
-    /// 确保去抖定时器已初始化。
+    /// 确保去抖定时器已初始化，幂等调用安全。
     /// </summary>
     private void EnsureTimerInitialized()
     {
@@ -206,6 +210,8 @@ public sealed partial class Editor : Page
     /// <summary>
     /// 处理 ScrollViewer 滚动事件，通过去抖定时器触发视窗高亮刷新。
     /// </summary>
+    /// <param name="sender">事件源，即内部 ScrollViewer。</param>
+    /// <param name="e">滚动视图变更事件参数。</param>
     private void OnScrollViewerViewChanged(object? sender, ScrollViewerViewChangedEventArgs e)
     {
         if (_isApplyingFormatting || _isPointerSelecting)
@@ -231,6 +237,9 @@ public sealed partial class Editor : Page
     /// <summary>
     /// 在可视树中递归查找指定类型的第一个后代元素。
     /// </summary>
+    /// <typeparam name="T">要查找的后代元素类型，必须继承自 <see cref="DependencyObject"/>。</typeparam>
+    /// <param name="parent">起始父节点，不允许为 null。</param>
+    /// <returns>找到的第一个匹配后代元素；未找到时返回 null。</returns>
     private static T? FindDescendant<T>(DependencyObject parent) where T : DependencyObject
     {
         int childCount = VisualTreeHelper.GetChildrenCount(parent);
@@ -285,6 +294,8 @@ public sealed partial class Editor : Page
     /// <summary>
     /// 处理编辑器的右键菜单请求事件，替换默认的富文本格式菜单。
     /// </summary>
+    /// <param name="sender">事件源。</param>
+    /// <param name="args">上下文请求事件参数，将被标记为已处理。</param>
     private async void CodeEditor_ContextRequested(UIElement sender, ContextRequestedEventArgs args)
     {
         args.Handled = true;
@@ -292,7 +303,6 @@ public sealed partial class Editor : Page
         string text = GetPlainText();
         if (string.IsNullOrEmpty(text))
         {
-            // 编辑器为空时，优先提供粘贴与 AI 生成两种入口
             await PasteTextFromClipboardAsync();
             return;
         }
@@ -303,6 +313,11 @@ public sealed partial class Editor : Page
     /// <summary>
     /// 从系统剪贴板获取纯文本并粘贴到编辑器中。
     /// </summary>
+    /// <returns>表示异步粘贴操作的任务。</returns>
+    /// <remarks>
+    /// 完成语义：粘贴成功后文本插入到当前光标位置；若超出字符限制则截断并弹出提示。
+    /// 涉及 I/O：访问系统剪贴板。
+    /// </remarks>
     private async Task PasteTextFromClipboardAsync()
     {
         try
@@ -347,20 +362,21 @@ public sealed partial class Editor : Page
     /// <summary>
     /// 构建并显示自定义代码编辑右键菜单。
     /// </summary>
+    /// <param name="args">上下文请求事件参数，用于获取菜单弹出位置。</param>
     private void ShowCodeContextMenu(ContextRequestedEventArgs args)
     {
         bool hasSelection = CodeEditor.Document.Selection.StartPosition != CodeEditor.Document.Selection.EndPosition;
 
         MenuFlyout flyout = new();
 
-        MenuFlyoutItem aiItem = new()
+        MenuFlyoutItem llmItem = new()
         {
             Text = Text.Localize("大模型生成"),
             Icon = new FontIcon { FontFamily = new FontFamily("Segoe MDL2 Assets"), Glyph = "\xE82F" },
             KeyboardAcceleratorTextOverride = "Ctrl+L",
         };
-        aiItem.Click += (_, _) => _ = HandleAiGenerateAsync();
-        flyout.Items.Add(aiItem);
+        llmItem.Click += (_, _) => _ = HandleLlmGenerateAsync();
+        flyout.Items.Add(llmItem);
 
         flyout.Items.Add(new MenuFlyoutSeparator());
 
@@ -435,6 +451,8 @@ public sealed partial class Editor : Page
     /// <summary>
     /// 处理编辑器指针按下事件，进入拖动选区保护状态。
     /// </summary>
+    /// <param name="sender">事件源。</param>
+    /// <param name="e">指针路由事件参数。</param>
     private void CodeEditor_PointerPressed(object sender, PointerRoutedEventArgs e)
     {
         PointerPoint point = e.GetCurrentPoint(CodeEditor);
@@ -448,6 +466,8 @@ public sealed partial class Editor : Page
     /// <summary>
     /// 处理编辑器指针释放事件，退出拖动选区保护状态。
     /// </summary>
+    /// <param name="sender">事件源。</param>
+    /// <param name="e">指针路由事件参数。</param>
     private void CodeEditor_PointerReleased(object sender, PointerRoutedEventArgs e)
     {
         EndPointerSelectionAndScheduleHighlight();
@@ -456,6 +476,8 @@ public sealed partial class Editor : Page
     /// <summary>
     /// 处理编辑器指针取消事件，退出拖动选区保护状态。
     /// </summary>
+    /// <param name="sender">事件源。</param>
+    /// <param name="e">指针路由事件参数。</param>
     private void CodeEditor_PointerCanceled(object sender, PointerRoutedEventArgs e)
     {
         EndPointerSelectionAndScheduleHighlight();
@@ -464,6 +486,8 @@ public sealed partial class Editor : Page
     /// <summary>
     /// 处理编辑器指针捕获丢失事件，退出拖动选区保护状态。
     /// </summary>
+    /// <param name="sender">事件源。</param>
+    /// <param name="e">路由事件参数。</param>
     private void CodeEditor_PointerCaptureLost(object sender, RoutedEventArgs e)
     {
         EndPointerSelectionAndScheduleHighlight();
@@ -472,6 +496,8 @@ public sealed partial class Editor : Page
     /// <summary>
     /// 处理编辑器失焦事件，退出拖动选区保护状态。
     /// </summary>
+    /// <param name="sender">事件源。</param>
+    /// <param name="e">路由事件参数。</param>
     private void CodeEditor_LostFocus(object sender, RoutedEventArgs e)
     {
         EndPointerSelectionAndScheduleHighlight();
@@ -508,8 +534,10 @@ public sealed partial class Editor : Page
     #region 文本与光标事件
 
     /// <summary>
-    /// 处理代码文本变更事件，启动去抖定时器。
+    /// 处理代码文本变更事件，启动去抖定时器以延迟执行语言检测与高亮。
     /// </summary>
+    /// <param name="sender">事件源。</param>
+    /// <param name="e">路由事件参数。</param>
     private void CodeEditor_TextChanged(object sender, RoutedEventArgs e)
     {
         if (_isApplyingFormatting)
@@ -533,8 +561,10 @@ public sealed partial class Editor : Page
     }
 
     /// <summary>
-    /// 字符数量限制。
+    /// 截断超出限制的文本并弹出提示对话框。
     /// </summary>
+    /// <param name="text">当前编辑器的纯文本内容。</param>
+    /// <param name="maxLen">允许的最大字符数。</param>
     private void EnforceCharacterLimit(string text, int maxLen)
     {
         _isApplyingFormatting = true;
@@ -553,8 +583,12 @@ public sealed partial class Editor : Page
     }
 
     /// <summary>
-    /// 显示字符数限制对话框。
+    /// 显示字符数限制提示对话框，防止重复弹出。
     /// </summary>
+    /// <returns>表示异步对话框操作的任务。</returns>
+    /// <remarks>
+    /// 完成语义：对话框关闭后任务完成；通过 <see cref="_isShowingLimitDialog"/> 防止重入。
+    /// </remarks>
     private async Task ShowCharacterLimitDialogAsync()
     {
         if (_isShowingLimitDialog || XamlRoot is null)
@@ -587,6 +621,8 @@ public sealed partial class Editor : Page
     /// <summary>
     /// 处理光标位置变更事件，更新 ViewModel 中的行列信息。
     /// </summary>
+    /// <param name="sender">事件源。</param>
+    /// <param name="e">路由事件参数。</param>
     private void CodeEditor_SelectionChanged(object sender, RoutedEventArgs e)
     {
         if (_isApplyingFormatting)
@@ -621,8 +657,10 @@ public sealed partial class Editor : Page
     #region 键盘处理
 
     /// <summary>
-    /// 处理编辑器的按键预览事件，拦截 Ctrl+Enter、Ctrl+E、Ctrl+B/I/U 和 Tab 键。
+    /// 处理编辑器的按键预览事件，拦截 Ctrl+Enter、Ctrl+E、Ctrl+L、Ctrl+B/I/U 和 Tab 键。
     /// </summary>
+    /// <param name="sender">事件源。</param>
+    /// <param name="e">按键路由事件参数。</param>
     private void CodeEditor_PreviewKeyDown(object sender, KeyRoutedEventArgs e)
     {
         CoreVirtualKeyStates ctrlState = InputKeyboardSource.GetKeyStateForCurrentThread(VirtualKey.Control);
@@ -647,7 +685,7 @@ public sealed partial class Editor : Page
             if (e.Key == VirtualKey.L)
             {
                 e.Handled = true;
-                _ = HandleAiGenerateAsync();
+                _ = HandleLlmGenerateAsync();
                 return;
             }
 
@@ -679,6 +717,8 @@ public sealed partial class Editor : Page
     /// <summary>
     /// 处理 Ctrl+Enter 快捷键（Page 级后备）。
     /// </summary>
+    /// <param name="sender">触发快捷键的加速器。</param>
+    /// <param name="args">快捷键调用事件参数。</param>
     private void ExecuteAccelerator_Invoked(KeyboardAccelerator sender, KeyboardAcceleratorInvokedEventArgs args)
     {
         args.Handled = true;
@@ -688,6 +728,8 @@ public sealed partial class Editor : Page
     /// <summary>
     /// 处理 Ctrl+E 快捷键（Page 级后备）。
     /// </summary>
+    /// <param name="sender">触发快捷键的加速器。</param>
+    /// <param name="args">快捷键调用事件参数。</param>
     private void ArgsAccelerator_Invoked(KeyboardAccelerator sender, KeyboardAcceleratorInvokedEventArgs args)
     {
         args.Handled = true;
@@ -695,16 +737,18 @@ public sealed partial class Editor : Page
     }
 
     /// <summary>
-    /// 处理 Ctrl+G 快捷键（Page 级后备）。
+    /// 处理 Ctrl+L 快捷键（Page 级后备）。
     /// </summary>
-    private void AiGenerateAccelerator_Invoked(KeyboardAccelerator sender, KeyboardAcceleratorInvokedEventArgs args)
+    /// <param name="sender">触发快捷键的加速器。</param>
+    /// <param name="args">快捷键调用事件参数。</param>
+    private void LlmGenerateAccelerator_Invoked(KeyboardAccelerator sender, KeyboardAcceleratorInvokedEventArgs args)
     {
         args.Handled = true;
-        _ = HandleAiGenerateAsync();
+        _ = HandleLlmGenerateAsync();
     }
 
     /// <summary>
-    /// 删除当前行开头的至多 4 个空格。
+    /// 删除当前行开头的至多 4 个空格（Shift+Tab 反缩进）。
     /// </summary>
     private void RemoveLeadingIndent()
     {
@@ -748,7 +792,7 @@ public sealed partial class Editor : Page
     }
 
     /// <summary>
-    /// 计算当前视窗可见的字符范围（近似值）。
+    /// 计算当前视窗可见的字符范围（基于滚动比例的近似值）。
     /// </summary>
     /// <param name="text">编辑器当前的纯文本内容。</param>
     /// <returns>视窗范围的起始和结束字符索引元组。</returns>
@@ -860,6 +904,7 @@ public sealed partial class Editor : Page
     /// <summary>
     /// 获取当前主题下的默认文本颜色。
     /// </summary>
+    /// <returns>暗色主题返回浅灰色，亮色主题返回深灰色。</returns>
     private Color GetDefaultTextColor()
     {
         return ActualTheme == ElementTheme.Dark
@@ -870,6 +915,8 @@ public sealed partial class Editor : Page
     /// <summary>
     /// 获取指定 Token 类型在当前主题下的着色。
     /// </summary>
+    /// <param name="type">Token 分类类型。</param>
+    /// <returns>该 Token 类型对应的前景色。</returns>
     private Color GetColorForToken(TokenType type)
     {
         bool dark = ActualTheme == ElementTheme.Dark;
@@ -888,8 +935,12 @@ public sealed partial class Editor : Page
     #region 命令行参数
 
     /// <summary>
-    /// 显示命令行参数输入对话框。
+    /// 显示命令行参数输入对话框，允许用户设置或清除参数。
     /// </summary>
+    /// <returns>表示异步对话框操作的任务。</returns>
+    /// <remarks>
+    /// 完成语义：对话框关闭后任务完成，不可重入。
+    /// </remarks>
     public async Task HandleArgsRequestAsync()
     {
         if (XamlRoot is null)
@@ -954,36 +1005,44 @@ public sealed partial class Editor : Page
 
     #endregion
 
-    #region AI 生成代码
+    #region LLM 生成代码
 
     /// <summary>
-    /// 显示 AI 代码生成对话框，允许用户输入需求描述，调用 LLM 生成并加载脚本代码。
+    /// 显示 LLM 代码生成对话框，允许用户输入需求描述，调用 LLM 生成并加载脚本代码。
     /// </summary>
-    public async Task HandleAiGenerateAsync()
+    /// <returns>表示异步生成流程的任务。</returns>
+    /// <remarks>
+    /// 完成语义：对话框关闭后任务完成；通过 <see cref="_isLlmGenerating"/> 防止重入。
+    /// </remarks>
+    public async Task HandleLlmGenerateAsync()
     {
-        if (_isAiGenerating || XamlRoot is null)
+        if (_isLlmGenerating || XamlRoot is null)
         {
             return;
         }
 
-        _isAiGenerating = true;
+        _isLlmGenerating = true;
 
         try
         {
-            await ShowAiGenerateDialogAsync();
+            await ShowLlmGenerateDialogAsync();
         }
         finally
         {
-            _isAiGenerating = false;
+            _isLlmGenerating = false;
         }
     }
 
     /// <summary>
-    /// 构建并显示 AI 生成对话框，执行生成流程。
+    /// 构建并显示 LLM 生成对话框，执行生成流程。
     /// </summary>
-    private async Task ShowAiGenerateDialogAsync()
+    /// <returns>表示异步对话框操作的任务。</returns>
+    /// <remarks>
+    /// 完成语义：对话框关闭并将生成结果（若有）加载到编辑器后任务完成。
+    /// 涉及 I/O：通过 <see cref="LlmClient"/> 发起网络请求。
+    /// </remarks>
+    private async Task ShowLlmGenerateDialogAsync()
     {
-        // ── 构建对话框内容 ──
         StackPanel contentPanel = new() { Spacing = 12, MinWidth = 480 };
 
         TextBox promptBox = new()
@@ -994,7 +1053,6 @@ public sealed partial class Editor : Page
         };
         contentPanel.Children.Add(promptBox);
 
-        // 语言选择行
         StackPanel langRow = new()
         {
             Orientation = Orientation.Horizontal,
@@ -1009,8 +1067,7 @@ public sealed partial class Editor : Page
             Style = (Style)Application.Current.Resources["BodyTextBlockStyle"],
         });
 
-        var langOptions = new List<string> { Text.Localize("自动") };
-        langOptions.AddRange(Config.SupportedLanguages.Select(l => l.ToUpperInvariant()));
+        List<string> langOptions = [Text.Localize("自动"), .. Config.SupportedLanguages.Select(l => l.ToUpperInvariant())];
 
         ComboBox langBox = new()
         {
@@ -1022,7 +1079,6 @@ public sealed partial class Editor : Page
         langRow.Children.Add(langBox);
         contentPanel.Children.Add(langRow);
 
-        // 进度环（初始隐藏）
         StackPanel progressRow = new()
         {
             Orientation = Orientation.Horizontal,
@@ -1039,7 +1095,6 @@ public sealed partial class Editor : Page
         });
         contentPanel.Children.Add(progressRow);
 
-        // 错误提示（初始隐藏）
         TextBlock errorText = new()
         {
             Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 196, 43, 28)),
@@ -1048,7 +1103,6 @@ public sealed partial class Editor : Page
         };
         contentPanel.Children.Add(errorText);
 
-        // ── 构建对话框 ──
         ContentDialog dialog = new()
         {
             Title = Text.Localize("大模型生成代码"),
@@ -1062,7 +1116,6 @@ public sealed partial class Editor : Page
         string? generatedCode = null;
         CancellationTokenSource? cts = null;
 
-        // ── 生成按钮点击处理（保持对话框打开，异步执行）──
         dialog.PrimaryButtonClick += async (_, args) =>
         {
             string prompt = promptBox.Text.Trim();
@@ -1072,7 +1125,6 @@ public sealed partial class Editor : Page
                 return;
             }
 
-            // 防止对话框关闭，切换为加载状态
             args.Cancel = true;
             cts?.Dispose();
             cts = new CancellationTokenSource();
@@ -1082,10 +1134,8 @@ public sealed partial class Editor : Page
                 cts);
         };
 
-        // 取消按钮点击时中止正在进行的请求
         dialog.CloseButtonClick += (_, _) => cts?.Cancel();
 
-        // Enter 键快速提交（与点击"生成"按钮等效）
         promptBox.KeyDown += (_, keyArgs) =>
         {
             if (keyArgs.Key == VirtualKey.Enter)
@@ -1106,7 +1156,6 @@ public sealed partial class Editor : Page
 
         await dialog.ShowAsync();
 
-        // ── 释放 CTS 并将生成结果加载到编辑器 ──
         cts?.Dispose();
         cts = null;
 
@@ -1119,6 +1168,7 @@ public sealed partial class Editor : Page
     /// <summary>
     /// 将生成的代码加载到编辑器，并触发语言检测与高亮。
     /// </summary>
+    /// <param name="code">要加载的代码文本。</param>
     private void LoadCodeIntoEditor(string code)
     {
         _isApplyingFormatting = true;
@@ -1144,10 +1194,21 @@ public sealed partial class Editor : Page
     }
 
     /// <summary>
-    /// 执行 AI 生成的核心逻辑：调用 LlmClient，更新对话框 UI 状态，成功后关闭对话框。
+    /// 执行 LLM 生成的核心逻辑：调用 <see cref="LlmClient"/>，更新对话框 UI 状态，成功后关闭对话框。
     /// </summary>
+    /// <param name="dialog">承载生成流程的对话框实例。</param>
+    /// <param name="promptBox">用户输入需求描述的文本框。</param>
+    /// <param name="langBox">语言选择下拉框。</param>
+    /// <param name="progressRow">进度指示面板。</param>
+    /// <param name="errorText">错误提示文本块。</param>
+    /// <param name="onSuccess">生成成功时的回调，接收生成的代码文本。</param>
+    /// <param name="cts">取消令牌源，允许为 null；调用方负责释放。</param>
+    /// <returns>表示异步生成操作的任务。</returns>
     /// <remarks>
-    /// 注意：调用方负责 cts 的释放，本方法不释放 cts。
+    /// 调用方负责 <paramref name="cts"/> 的释放，本方法不释放。
+    /// 取消语义：通过 <paramref name="cts"/> 取消时静默处理，不关闭对话框。
+    /// 完成语义：成功时调用 <paramref name="onSuccess"/> 并关闭对话框；失败时显示错误信息并恢复输入状态。
+    /// 涉及 I/O：通过 <see cref="LlmClient.GenerateScriptAsync"/> 发起网络请求。
     /// </remarks>
     private static async Task RunGenerationAsync(
         ContentDialog dialog,
@@ -1177,7 +1238,7 @@ public sealed partial class Editor : Page
         }
         catch (OperationCanceledException)
         {
-            // 用户取消，静默处理
+            // CANCEL-001: 用户主动取消 LLM 生成请求，无需处理
         }
         catch (Exception ex)
         {
@@ -1195,8 +1256,12 @@ public sealed partial class Editor : Page
     #region 执行流程
 
     /// <summary>
-    /// 处理执行请求。由 MainWindow 的运行按钮和 Ctrl+Enter 调用。
+    /// 处理执行请求，由 MainWindow 的运行按钮和 Ctrl+Enter 调用。
     /// </summary>
+    /// <remarks>
+    /// 采用 async void 以适配事件处理器调用模式；通过 <see cref="_isExecuting"/> 防止重入。
+    /// 涉及 I/O：创建临时文件并启动终端进程。
+    /// </remarks>
     public async void HandleExecuteRequest()
     {
         if (_isExecuting || XamlRoot is null)
@@ -1278,6 +1343,10 @@ public sealed partial class Editor : Page
     /// <summary>
     /// 根据配置确定执行使用的语言，必要时弹出语言选择对话框。
     /// </summary>
+    /// <returns>用户选择或自动检测到的语言标识符；若用户取消选择则返回 null。</returns>
+    /// <remarks>
+    /// 完成语义：若已有明确语言则直接返回，否则弹出对话框等待用户选择后返回。
+    /// </remarks>
     private async Task<string?> DetermineExecutionLanguageAsync()
     {
         if (ViewModel.ShouldShowLanguageSelector)
@@ -1299,8 +1368,10 @@ public sealed partial class Editor : Page
     #region 语言选择对话框
 
     /// <summary>
-    /// 处理状态栏语言指示器按钮点击事件。
+    /// 处理状态栏语言指示器按钮点击事件，弹出语言选择对话框。
     /// </summary>
+    /// <param name="sender">事件源。</param>
+    /// <param name="e">路由事件参数。</param>
     private async void LanguageButton_Click(object sender, RoutedEventArgs e)
     {
         if (XamlRoot is null)
@@ -1328,8 +1399,13 @@ public sealed partial class Editor : Page
     }
 
     /// <summary>
-    /// 显示语言选择对话框。
+    /// 显示语言选择对话框，按检测置信度排序展示可用语言。
     /// </summary>
+    /// <param name="includeAutoDetect">是否在列表顶部包含"自动检测"选项。</param>
+    /// <returns>用户选择的语言标识符，或 <see cref="AutoDetectToken"/>；若取消则返回 null。</returns>
+    /// <remarks>
+    /// 完成语义：对话框关闭后返回选择结果，不修改 ViewModel 状态（由调用方决定）。
+    /// </remarks>
     private async Task<string?> ShowLanguageSelectionDialogAsync(bool includeAutoDetect)
     {
         IReadOnlyList<DetectionResult> results = ViewModel.DetectionResults;
@@ -1493,6 +1569,7 @@ public sealed partial class Editor : Page
     /// <summary>
     /// 从 RichEditBox 获取纯文本内容，去除尾部自动追加的 \r。
     /// </summary>
+    /// <returns>编辑器中的纯文本，不含尾部 \r。</returns>
     private string GetPlainText()
     {
         CodeEditor.Document.GetText(TextGetOptions.None, out string text);
@@ -1506,8 +1583,10 @@ public sealed partial class Editor : Page
     }
 
     /// <summary>
-    /// 将 RichEditBox 文本规范化为 \n 换行，供 Highlight.Analyze 和 LanguageDetector 使用。
+    /// 将 RichEditBox 文本规范化为 \n 换行，供 <see cref="Highlight.Analyze"/> 和语言检测器使用。
     /// </summary>
+    /// <param name="text">原始文本，使用 \r 换行。</param>
+    /// <returns>将 \r 替换为 \n 后的规范化文本。</returns>
     private static string NormalizeForAnalysis(string text)
     {
         return text.Replace('\r', '\n');

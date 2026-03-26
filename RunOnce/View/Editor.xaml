@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
     @file: View/Editor.xaml
-    @date: 2026-03-24
+    @date: 2026-03-26
 -->
 <Page
     x:Class="RunOnce.View.Editor"
@@ -47,7 +47,7 @@
                              Invoked="ArgsAccelerator_Invoked"/>
         <KeyboardAccelerator Key="L"
                              Modifiers="Control"
-                             Invoked="AiGenerateAccelerator_Invoked"/>
+                             Invoked="LlmGenerateAccelerator_Invoked"/>
     </Page.KeyboardAccelerators>
 
     <Grid Background="Transparent">

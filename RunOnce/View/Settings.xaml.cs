@@ -4,7 +4,7 @@
  *
  * @author: WaterRun
  * @file: View/Settings.xaml.cs
- * @date: 2026-03-24
+ * @date: 2026-03-26
  */
 
 #nullable enable
@@ -239,9 +239,9 @@ public sealed partial class Settings : Page
         AdvancedSettingsLabel.Text = Text.Localize("高级设置");
         AdvancedSettingsDescription.Text = Text.Localize("配置临时文件、置信度阈值和语言命令");
         AdvancedSettingsButton.Content = Text.Localize("打开");
-        AiSettingsLabel.Text = Text.Localize("大模型设置");
-        AiSettingsDescription.Text = Text.Localize("配置 LLM API 以生成脚本代码");
-        AiSettingsButton.Content = Text.Localize("打开");
+        LlmSettingsLabel.Text = Text.Localize("大模型设置");
+        LlmSettingsDescription.Text = Text.Localize("配置 LLM API 以生成脚本代码");
+        LlmSettingsButton.Content = Text.Localize("打开");
 
         ApplyWideLocalizedTexts();
         ApplyNarrowAboutLocalizedTexts();
@@ -594,7 +594,7 @@ public sealed partial class Settings : Page
 
     #endregion
 
-    #region AI 设置对话框
+    #region LLM 设置对话框
 
     /// <summary>
     /// 处理"打开大模型设置"按钮点击事件，构建并异步显示大模型配置对话框。
@@ -605,9 +605,9 @@ public sealed partial class Settings : Page
     /// 取消语义：无 <see cref="System.Threading.CancellationToken"/>，对话框关闭即完成，不可取消。
     /// 线程/重入：async void 事件处理器，仅在 UI 线程调用。
     /// </remarks>
-    private async void AiSettingsButton_Click(object sender, RoutedEventArgs e)
+    private async void LlmSettingsButton_Click(object sender, RoutedEventArgs e)
     {
-        ContentDialog dialog = BuildAiSettingsDialog();
+        ContentDialog dialog = BuildLlmSettingsDialog();
         await dialog.ShowAsync();
     }
 
@@ -615,7 +615,7 @@ public sealed partial class Settings : Page
     /// 构建并返回包含 API Key、基础 URL、模型名称、最大 Token 数与请求超时配置控件的大模型设置 <see cref="ContentDialog"/>。
     /// </summary>
     /// <returns>已配置好内容区域、保存与取消按钮及配置写入逻辑的大模型设置对话框实例。</returns>
-    private ContentDialog BuildAiSettingsDialog()
+    private ContentDialog BuildLlmSettingsDialog()
     {
         StackPanel contentPanel = new() { Spacing = 16, MinWidth = 450, Margin = new Thickness(0, 0, 8, 0) };
 

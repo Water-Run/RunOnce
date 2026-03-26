@@ -4,7 +4,7 @@
  * 
  * @author: WaterRun
  * @file: App.xaml.cs
- * @date: 2026-02-11
+ * @date: 2026-03-26
  */
 
 #nullable enable
@@ -43,10 +43,10 @@ public partial class App : Application
     public string LaunchArguments { get; private set; } = string.Empty;
 
     /// <summary>
-    /// 获取应用程序是否以 AI 生成模式启动。
+    /// 获取应用程序是否以 LLM 生成模式启动。
     /// </summary>
-    /// <value>当启动参数中包含 <c>--ai</c> 标志时为 true。</value>
-    public bool IsAiMode { get; private set; }
+    /// <value>当启动参数中包含 <c>--llm</c> 标志时为 true。</value>
+    public bool IsLlmMode { get; private set; }
 
     /// <summary>
     /// 初始化应用程序实例。
@@ -67,21 +67,21 @@ public partial class App : Application
     {
         string rawArgs = args.Arguments ?? string.Empty;
 
-        // 检测并剥离 --ai 标志
-        const string aiFlag = " --ai";
-        if (rawArgs.EndsWith(aiFlag, StringComparison.OrdinalIgnoreCase))
+        // 检测并剥离 --llm 标志
+        const string llmFlag = " --llm";
+        if (rawArgs.EndsWith(llmFlag, StringComparison.OrdinalIgnoreCase))
         {
-            IsAiMode = true;
-            LaunchArguments = rawArgs[..^aiFlag.Length].Trim();
+            IsLlmMode = true;
+            LaunchArguments = rawArgs[..^llmFlag.Length].Trim();
         }
-        else if (rawArgs.Equals("--ai", StringComparison.OrdinalIgnoreCase))
+        else if (rawArgs.Equals("--llm", StringComparison.OrdinalIgnoreCase))
         {
-            IsAiMode = true;
+            IsLlmMode = true;
             LaunchArguments = string.Empty;
         }
         else
         {
-            IsAiMode = false;
+            IsLlmMode = false;
             LaunchArguments = rawArgs;
         }
 
