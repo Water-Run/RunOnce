@@ -480,6 +480,19 @@ public sealed class SettingsViewModel : INotifyPropertyChanged
 
     #endregion
 
+    #region LLM 设置
+
+    /// <summary>
+    /// 将所有 LLM 相关设置重置为默认值并清除验证状态。
+    /// </summary>
+    public void ResetLlmSettings()
+    {
+        Config.ResetLlmSettings();
+        LlmClient.ResetVerificationState();
+    }
+
+    #endregion
+
     #region 整体重置
 
     /// <summary>
@@ -488,6 +501,7 @@ public sealed class SettingsViewModel : INotifyPropertyChanged
     public void ResetAllSettings()
     {
         Config.ResetAllSettings();
+        LlmClient.ResetVerificationState();
 
         _isSuppressingChanges = true;
         RefreshOptionTexts();

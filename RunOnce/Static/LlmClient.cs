@@ -1,6 +1,6 @@
 /*
  * LLM API 客户端
- * 提供与 OpenAI 兼容的 LLM API 交互功能，用于根据用户描述生成脚本代码
+ * 提供与 OpenAI 兼容的 LLM API 交互功能，包括连接验证、脚本生成与二次校对
  *
  * @author: WaterRun
  * @file: Static/LlmClient.cs
@@ -19,10 +19,10 @@ using System.Threading.Tasks;
 
 namespace RunOnce.Static;
 
-/// <summary>LLM API 客户端，封装与 OpenAI 兼容接口的脚本生成能力。</summary>
+/// <summary>LLM API 客户端，封装连接验证、脚本生成与二次校对能力。</summary>
 /// <remarks>
 /// 不变量：<see cref="_httpClient"/> 全局唯一，复用底层 TCP 连接以避免套接字耗尽。
-/// 线程安全：所有公共方法均为线程安全，每次调用无共享可变状态。
+/// 线程安全：所有公共方法均为线程安全，每次调用无共享可变状态（<see cref="IsConnectionVerified"/> 除外，仅在 UI 线程读写）。
 /// 副作用：发起 HTTP 请求并消耗 LLM API 额度。
 /// </remarks>
 public static class LlmClient
@@ -37,28 +37,79 @@ public static class LlmClient
         Timeout = Timeout.InfiniteTimeSpan,
     };
 
+    /// <summary>
+    /// 当前会话内 LLM 连接是否已通过验证；仅保存于内存，每次启动需重新验证。
+    /// </summary>
+    /// <value>true 表示本次会话已成功验证过连接，false 表示未验证或验证失败。</value>
+    public static bool IsConnectionVerified { get; private set; }
+
+    /// <summary>验证当前 LLM 配置的连接可达性，向 API 发送一次最小请求。</summary>
+    /// <param name="cancellationToken">取消令牌。</param>
+    /// <returns>验证成功返回 true，任何失败返回 false。</returns>
+    /// <exception cref="OperationCanceledException">当 <paramref name="cancellationToken"/> 被触发时抛出。</exception>
+    /// <remarks>
+    /// 取消语义：支持通过 <paramref name="cancellationToken"/> 取消，超时为配置值。
+    /// 线程/重入：可安全并发调用。
+    /// I/O：向 <see cref="Config.LlmBaseUrl"/> 发起一次 HTTP POST 请求。
+    /// </remarks>
+    public static async Task<bool> VerifyConnectionAsync(CancellationToken cancellationToken = default)
+    {
+        string apiKey = Config.LlmApiKey;
+        if (string.IsNullOrWhiteSpace(apiKey))
+        {
+            IsConnectionVerified = false;
+            return false;
+        }
+
+        string baseUrl = Config.LlmBaseUrl.TrimEnd('/');
+        var requestBody = new
+        {
+            model = Config.LlmModel,
+            messages = new[] { new { role = "user", content = "hi" } },
+            max_tokens = 1,
+        };
+
+        using var request = new HttpRequestMessage(HttpMethod.Post, $"{baseUrl}/chat/completions");
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
+        request.Content = new StringContent(
+            JsonSerializer.Serialize(requestBody), Encoding.UTF8, "application/json");
+
+        using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        timeoutCts.CancelAfter(TimeSpan.FromSeconds(Config.LlmTimeoutSeconds));
+
+        try
+        {
+            HttpResponseMessage response = await _httpClient
+                .SendAsync(request, timeoutCts.Token)
+                .ConfigureAwait(false);
+
+            IsConnectionVerified = response.IsSuccessStatusCode;
+            return IsConnectionVerified;
+        }
+        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException)
+        {
+            IsConnectionVerified = false;
+            return false;
+        }
+    }
+
     /// <summary>根据用户需求描述调用 LLM API 生成可执行脚本代码。</summary>
     /// <param name="userPrompt">用户输入的需求描述，不允许为 null 或空白字符串。</param>
     /// <param name="preferredLanguage">
-    /// 用户指定的脚本语言标识符（如 "python"、"powershell"）；
-    /// 为 null 时由 LLM 根据需求自动选择最合适的语言。
+    /// 用户选择的脚本语言标识符（如 "python"）；
+    /// 为 null 时使用 <see cref="Config.LlmLanguagePreference"/>。
     /// </param>
     /// <param name="cancellationToken">取消令牌，用于中止正在进行的网络请求。</param>
     /// <returns>LLM 生成的纯脚本代码字符串，已去除可能附带的 Markdown 围栏标记。</returns>
     /// <exception cref="ArgumentNullException">当 <paramref name="userPrompt"/> 为 null 时抛出。</exception>
     /// <exception cref="ArgumentException">当 <paramref name="userPrompt"/> 为空白字符串时抛出。</exception>
-    /// <exception cref="InvalidOperationException">
-    /// 当 <see cref="Config.LlmApiKey"/> 未配置时抛出；
-    /// 或当 API 返回非成功状态码时抛出（消息中包含 HTTP 状态码与错误详情）。
-    /// </exception>
-    /// <exception cref="TimeoutException">当请求超过 <see cref="Config.LlmTimeoutSeconds"/> 配置的秒数时抛出。</exception>
-    /// <exception cref="HttpRequestException">当底层网络传输失败时抛出。</exception>
-    /// <exception cref="OperationCanceledException">当 <paramref name="cancellationToken"/> 被触发时抛出。</exception>
+    /// <exception cref="InvalidOperationException">当 API Key 未配置或 API 返回错误时抛出。</exception>
+    /// <exception cref="TimeoutException">当请求超时时抛出。</exception>
+    /// <exception cref="HttpRequestException">当网络传输失败时抛出。</exception>
+    /// <exception cref="OperationCanceledException">当取消令牌被触发时抛出。</exception>
     /// <remarks>
-    /// 取消语义：支持通过 <paramref name="cancellationToken"/> 取消。超时由内部链式
-    /// <see cref="CancellationTokenSource"/> 控制，超时场景抛出 <see cref="TimeoutException"/>
-    /// 而非 <see cref="OperationCanceledException"/>，以便调用方区分主动取消与超时。
-    /// 线程/重入：可安全地从多个线程并发调用，每次调用独立且无共享可变状态。
+    /// 取消语义：支持通过 <paramref name="cancellationToken"/> 取消。
+    /// 线程/重入：可安全并发调用。
     /// I/O：向 <see cref="Config.LlmBaseUrl"/> 发起一次 HTTP POST 请求。
     /// </remarks>
     public static async Task<string> GenerateScriptAsync(
@@ -80,18 +131,93 @@ public static class LlmClient
                 Text.Localize("尚未配置 API Key，请在设置中配置 LLM API Key。"));
         }
 
+        string language = !string.IsNullOrWhiteSpace(preferredLanguage)
+            ? preferredLanguage
+            : Config.LlmLanguagePreference;
+
+        string systemContent = BuildSystemPrompt(language);
+
+        return await SendChatRequestAsync(systemContent, userPrompt, Config.LlmMaxTokens, Config.LlmTimeoutSeconds, cancellationToken)
+            .ConfigureAwait(false);
+    }
+
+    /// <summary>对已生成的代码进行二次校对，验证其是否符合用户需求。</summary>
+    /// <param name="userPrompt">原始用户需求描述。不允许为 null 或空白。</param>
+    /// <param name="generatedCode">待校对的生成代码。不允许为 null 或空白。</param>
+    /// <param name="cancellationToken">取消令牌。</param>
+    /// <returns>
+    /// 元组：Code 为最终代码（校对通过时为原始代码，未通过时为修正后的代码），
+    /// Passed 表示原始代码是否被判定为正确。
+    /// </returns>
+    /// <exception cref="ArgumentNullException">当参数为 null 时抛出。</exception>
+    /// <exception cref="InvalidOperationException">当 API 返回错误时抛出。</exception>
+    /// <exception cref="TimeoutException">当请求超时时抛出。超时为配置值的两倍。</exception>
+    /// <exception cref="OperationCanceledException">当取消令牌被触发时抛出。</exception>
+    /// <remarks>
+    /// 取消语义：支持取消。超时为 <see cref="Config.LlmTimeoutSeconds"/> 的两倍。
+    /// 线程/重入：可安全并发调用。
+    /// I/O：向 <see cref="Config.LlmBaseUrl"/> 发起一次 HTTP POST 请求。
+    /// </remarks>
+    public static async Task<(string Code, bool Passed)> DoubleCheckAsync(
+        string userPrompt,
+        string generatedCode,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(userPrompt);
+        ArgumentNullException.ThrowIfNull(generatedCode);
+
+        string systemContent = Text.Localize(
+            "你是一个代码审查助手。用户的需求是：") + userPrompt +
+            Text.Localize("。请检查以下代码是否正确实现了该需求。如果代码正确，仅回复 PASS。如果代码有误，直接给出修正后的完整代码，不要包含任何解释或 Markdown 标记。");
+
+        int doubleTimeout = Config.LlmTimeoutSeconds * 2;
+
+        string response = await SendChatRequestAsync(
+                systemContent, generatedCode, Config.LlmMaxTokens, doubleTimeout, cancellationToken)
+            .ConfigureAwait(false);
+
+        string trimmed = response.Trim();
+        if (trimmed.Equals("PASS", StringComparison.OrdinalIgnoreCase)
+            || trimmed.StartsWith("PASS", StringComparison.OrdinalIgnoreCase))
+        {
+            return (generatedCode, true);
+        }
+
+        return (StripMarkdownCodeBlock(trimmed), false);
+    }
+
+    /// <summary>清除内存中的连接验证状态，使下次使用前需重新验证。</summary>
+    public static void ResetVerificationState()
+    {
+        IsConnectionVerified = false;
+    }
+
+    #region 私有方法
+
+    /// <summary>向 LLM API 发送一次聊天请求并返回助手回复内容。</summary>
+    /// <param name="systemContent">系统提示词。</param>
+    /// <param name="userContent">用户消息内容。</param>
+    /// <param name="maxTokens">最大生成 Token 数。</param>
+    /// <param name="timeoutSeconds">请求超时秒数。</param>
+    /// <param name="cancellationToken">取消令牌。</param>
+    /// <returns>提取并清理后的助手回复文本。</returns>
+    private static async Task<string> SendChatRequestAsync(
+        string systemContent,
+        string userContent,
+        int maxTokens,
+        int timeoutSeconds,
+        CancellationToken cancellationToken)
+    {
+        string apiKey = Config.LlmApiKey;
         string baseUrl = Config.LlmBaseUrl.TrimEnd('/');
-        string model = Config.LlmModel;
-        int maxTokens = Config.LlmMaxTokens;
-        string systemContent = BuildSystemPrompt(preferredLanguage);
 
         var requestBody = new
         {
-            model,
+            model = Config.LlmModel,
             messages = new[]
             {
                 new { role = "system", content = systemContent },
-                new { role = "user", content = userPrompt },
+                new { role = "user", content = userContent },
             },
             max_tokens = maxTokens,
         };
@@ -102,7 +228,7 @@ public static class LlmClient
             JsonSerializer.Serialize(requestBody), Encoding.UTF8, "application/json");
 
         using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        timeoutCts.CancelAfter(TimeSpan.FromSeconds(Config.LlmTimeoutSeconds));
+        timeoutCts.CancelAfter(TimeSpan.FromSeconds(timeoutSeconds));
 
         HttpResponseMessage response;
         try
@@ -133,36 +259,27 @@ public static class LlmClient
         return ExtractGeneratedCode(responseJson);
     }
 
-    /// <summary>根据可选的目标语言构建 LLM 系统提示词。</summary>
-    /// <param name="preferredLanguage">
-    /// 用户指定的脚本语言标识符；为 null 或空时生成不限定语言的通用提示词。
-    /// </param>
-    /// <returns>完整的系统提示词字符串，指导 LLM 仅输出纯代码而不附带解释或标记。</returns>
-    private static string BuildSystemPrompt(string? preferredLanguage)
+    /// <summary>根据目标语言与附加提示词构建系统提示词。</summary>
+    /// <param name="language">目标脚本语言标识符。</param>
+    /// <returns>完整的系统提示词。</returns>
+    private static string BuildSystemPrompt(string language)
     {
-        if (!string.IsNullOrEmpty(preferredLanguage))
+        string basePrompt = Text.Localize(
+            "你是一个专业的脚本生成助手。根据用户的需求，使用 {0} 语言生成可执行的脚本代码。仅输出脚本代码本身，不要包含任何解释、注释说明或 Markdown 代码块标记。",
+            language);
+
+        string additionalPrompt = Config.LlmAdditionalPrompt;
+        if (!string.IsNullOrWhiteSpace(additionalPrompt))
         {
-            return Text.Localize(
-                "你是一个专业的脚本生成助手。根据用户的需求，使用 {0} 语言生成可执行的脚本代码。"
-                + "仅输出脚本代码本身，不要包含任何解释、注释说明或 Markdown 代码块标记。",
-                preferredLanguage);
+            basePrompt += "\n" + additionalPrompt;
         }
 
-        return Text.Localize(
-            "你是一个专业的脚本生成助手。根据用户的需求生成可执行的脚本代码。"
-            + "仅输出脚本代码本身，不要包含任何解释、注释说明或 Markdown 代码块标记。"
-            + "支持的语言：bat、powershell、python、lua、nim、go。根据需求自动选择最合适的语言。");
+        return basePrompt;
     }
 
-    /// <summary>
-    /// 从成功的 API 响应 JSON 中提取 LLM 生成的代码内容。
-    /// 当 JSON 结构不符合 OpenAI Chat Completions 格式时，回退返回原始响应文本。
-    /// </summary>
-    /// <param name="responseJson">API 返回的完整 JSON 响应字符串。</param>
-    /// <returns>
-    /// 提取并去除 Markdown 围栏标记后的纯代码字符串；
-    /// 若解析失败则返回 <paramref name="responseJson"/> 原文。
-    /// </returns>
+    /// <summary>从成功的 API 响应 JSON 中提取助手回复内容。</summary>
+    /// <param name="responseJson">API 返回的完整 JSON 响应。</param>
+    /// <returns>提取的文本；解析失败时返回原始 JSON。</returns>
     private static string ExtractGeneratedCode(string responseJson)
     {
         try
@@ -181,20 +298,15 @@ public static class LlmClient
         }
         catch (JsonException)
         {
-            // LLM-001: 响应 JSON 结构异常，回退至原始文本以保持可用性
+            // LLM-001: 响应结构异常，回退至原始文本
         }
 
         return responseJson;
     }
 
-    /// <summary>
-    /// 从失败的 API 响应 JSON 中提取人类可读的错误消息。
-    /// 当 JSON 结构不包含 error.message 时，回退返回原始响应文本。
-    /// </summary>
-    /// <param name="responseJson">API 返回的错误 JSON 响应字符串。</param>
-    /// <returns>
-    /// 提取的错误消息文本；若解析失败则返回 <paramref name="responseJson"/> 原文。
-    /// </returns>
+    /// <summary>从错误响应 JSON 中提取错误消息。</summary>
+    /// <param name="responseJson">API 返回的错误 JSON 响应。</param>
+    /// <returns>错误消息文本；解析失败时返回原始 JSON。</returns>
     private static string ExtractErrorMessage(string responseJson)
     {
         try
@@ -216,9 +328,9 @@ public static class LlmClient
         return responseJson;
     }
 
-    /// <summary>去除 LLM 可能附加的 Markdown 围栏代码块标记（```language ... ```）。</summary>
-    /// <param name="code">待处理的代码字符串，可能包含 Markdown 围栏标记；允许为 null 或空。</param>
-    /// <returns>去除首尾 Markdown 围栏标记后的纯代码字符串；输入为 null 或空时原样返回。</returns>
+    /// <summary>去除 Markdown 围栏代码块标记。</summary>
+    /// <param name="code">待处理的代码字符串。</param>
+    /// <returns>去除标记后的纯代码。</returns>
     private static string StripMarkdownCodeBlock(string code)
     {
         if (string.IsNullOrEmpty(code))
@@ -246,4 +358,6 @@ public static class LlmClient
 
         return trimmed;
     }
+
+    #endregion
 }

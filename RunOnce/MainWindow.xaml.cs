@@ -255,6 +255,14 @@ public sealed partial class MainWindow : Window
     }
 
     /// <summary>
+    /// 供外部（如 Editor 页面）调用的导航到设置页面公开入口。
+    /// </summary>
+    public void NavigateToSettingsPublic()
+    {
+        NavigateToSettings();
+    }
+
+    /// <summary>
     /// 更新标题栏按钮可见性。
     /// </summary>
     /// <remarks>

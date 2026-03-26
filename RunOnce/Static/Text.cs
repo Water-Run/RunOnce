@@ -4,7 +4,7 @@
  *
  * @author: WaterRun
  * @file: Static/Text.cs
- * @date: 2026-03-24
+ * @date: 2026-03-26
  */
 
 #nullable enable
@@ -212,6 +212,31 @@ public static class Text
             "You are a professional script generation assistant. Generate executable script code in {0} based on the user's requirements. Output only the script code itself, without any explanations, comments, or Markdown code block markers.",
         ["你是一个专业的脚本生成助手。根据用户的需求生成可执行的脚本代码。仅输出脚本代码本身，不要包含任何解释、注释说明或 Markdown 代码块标记。支持的语言：bat、powershell、python、lua、nim、go。根据需求自动选择最合适的语言。"] =
             "You are a professional script generation assistant. Generate executable script code based on the user's requirements. Output only the script code itself, without any explanations, comments, or Markdown code block markers. Supported languages: bat, powershell, python, lua, nim, go. Automatically choose the most appropriate language.",
+        
+        // LLM 设置组
+        ["大模型"] = "LLM",
+        ["验证连接"] = "Verify Connection",
+        ["正在验证..."] = "Verifying...",
+        ["连接验证成功"] = "Connection verified",
+        ["连接验证失败: {0}"] = "Connection verification failed: {0}",
+        ["未验证"] = "Not verified",
+        ["LLM 高级设置"] = "LLM Advanced Settings",
+        ["配置语言偏好、附加提示词与校对选项"] = "Configure language preference, additional prompt and verification options",
+        ["语言偏好"] = "Language Preference",
+        ["附加提示词"] = "Additional Prompt",
+        ["附加提示词将自动加入生成请求"] = "Additional prompt will be automatically included in generation requests",
+        ["二次校对"] = "Double Check",
+        ["生成后再次验证代码是否符合需求"] = "Verify generated code meets requirements after generation",
+        ["自动立即执行"] = "Auto Execute",
+        ["二次校对通过后自动执行生成的代码"] = "Auto-execute generated code after double check passes",
+        ["重置大模型设置"] = "Reset LLM Settings",
+        ["正在校对..."] = "Verifying code...",
+        ["大模型生成的代码可能有误。"] = "AI-generated code may be incorrect.",
+        ["将覆盖编辑器中的现有内容，继续吗？"] = "This will overwrite existing content in the editor. Continue?",
+        ["覆盖"] = "Overwrite",
+        ["大模型设置未配置。前往设置并验证连接后使用。"] = "LLM settings not configured. Go to Settings and verify connection first.",
+        ["前往设置"] = "Go to Settings",
+        ["校对未通过，代码已加载但未自动执行。"] = "Double check did not pass. Code loaded but not auto-executed.",
     };
 
     /// <summary>

@@ -4,7 +4,7 @@
  *
  * @author: WaterRun
  * @file: Static/Config.cs
- * @date: 2026-03-24
+ * @date: 2026-03-26
  */
 
 #nullable enable
@@ -300,6 +300,18 @@ public static class Config
     /// <summary>LLM 请求超时秒数设置项的存储键名。</summary>
     private const string KeyLlmTimeoutSeconds = "LlmTimeoutSeconds";
 
+    /// <summary>LLM 语言偏好设置项的存储键名。</summary>
+    private const string KeyLlmLanguagePreference = "LlmLanguagePreference";
+
+    /// <summary>LLM 附加提示词设置项的存储键名。</summary>
+    private const string KeyLlmAdditionalPrompt = "LlmAdditionalPrompt";
+
+    /// <summary>LLM 二次校对开关设置项的存储键名。</summary>
+    private const string KeyLlmDoubleCheck = "LlmDoubleCheck";
+
+    /// <summary>LLM 自动立即执行开关设置项的存储键名。</summary>
+    private const string KeyLlmAutoExecute = "LlmAutoExecute";
+
     #endregion
 
     #region 默认值常量
@@ -314,16 +326,19 @@ public static class Config
     public const double DefaultConfidenceThreshold = 0.85;
 
     /// <summary>LLM API 基础 URL 的默认值（OpenAI 兼容端点）。</summary>
-    public const string DefaultLlmBaseUrl = "https://api.openai.com/v1";
+    public const string DefaultLlmBaseUrl = "https://api.poe.com/v1";
 
     /// <summary>LLM 模型名称的默认值。</summary>
-    public const string DefaultLlmModel = "gpt-4o-mini";
+    public const string DefaultLlmModel = "claude-opus-4.6";
 
     /// <summary>LLM 单次请求最大 Token 数的默认值。</summary>
-    public const int DefaultLlmMaxTokens = 4096;
+    public const int DefaultLlmMaxTokens = 16384;
 
     /// <summary>LLM 请求超时秒数的默认值。</summary>
     public const int DefaultLlmTimeoutSeconds = 60;
+
+    /// <summary>LLM 语言偏好的默认值。</summary>
+    public const string DefaultLlmLanguagePreference = "python";
 
     #endregion
 
@@ -823,6 +838,118 @@ public static class Config
         }
     }
 
+    /// <summary>
+    /// 获取或设置 LLM 生成时偏好的脚本语言标识符。
+    /// </summary>
+    /// <value>
+    /// 字符串，默认为 "python"。必须是 <see cref="SupportedLanguages"/> 中的有效值。
+    /// 设置时立即持久化到本地存储。
+    /// </value>
+    public static string LlmLanguagePreference
+    {
+        get
+        {
+            lock (_syncLock)
+            {
+                return _localSettings.Values.TryGetValue(KeyLlmLanguagePreference, out object? value)
+                       && value is string stringValue
+                       && !string.IsNullOrWhiteSpace(stringValue)
+                    ? stringValue
+                    : DefaultLlmLanguagePreference;
+            }
+        }
+        set
+        {
+            lock (_syncLock)
+            {
+                _localSettings.Values[KeyLlmLanguagePreference] = string.IsNullOrWhiteSpace(value)
+                    ? DefaultLlmLanguagePreference
+                    : value;
+            }
+        }
+    }
+
+    /// <summary>
+    /// 获取或设置 LLM 附加提示词，生成请求时自动拼入系统提示词。
+    /// </summary>
+    /// <value>
+    /// 字符串，默认为空。设置时立即持久化到本地存储。
+    /// </value>
+    public static string LlmAdditionalPrompt
+    {
+        get
+        {
+            lock (_syncLock)
+            {
+                return _localSettings.Values.TryGetValue(KeyLlmAdditionalPrompt, out object? value)
+                       && value is string stringValue
+                    ? stringValue
+                    : string.Empty;
+            }
+        }
+        set
+        {
+            lock (_syncLock)
+            {
+                _localSettings.Values[KeyLlmAdditionalPrompt] = value ?? string.Empty;
+            }
+        }
+    }
+
+    /// <summary>
+    /// 获取或设置是否启用 LLM 二次校对。
+    /// </summary>
+    /// <value>
+    /// 布尔值，true 表示生成后再次校验代码是否符合需求。默认为 false。
+    /// 设置时立即持久化到本地存储。
+    /// </value>
+    public static bool LlmDoubleCheck
+    {
+        get
+        {
+            lock (_syncLock)
+            {
+                return _localSettings.Values.TryGetValue(KeyLlmDoubleCheck, out object? value)
+                       && value is bool boolValue
+                       && boolValue;
+            }
+        }
+        set
+        {
+            lock (_syncLock)
+            {
+                _localSettings.Values[KeyLlmDoubleCheck] = value;
+            }
+        }
+    }
+
+    /// <summary>
+    /// 获取或设置二次校对通过后是否自动立即执行生成的代码。
+    /// </summary>
+    /// <value>
+    /// 布尔值，仅在 <see cref="LlmDoubleCheck"/> 为 true 时有效。默认为 false。
+    /// 设置时立即持久化到本地存储。
+    /// </value>
+    public static bool LlmAutoExecute
+    {
+        get
+        {
+            lock (_syncLock)
+            {
+                return _localSettings.Values.TryGetValue(KeyLlmAutoExecute, out object? value)
+                       && value is bool boolValue
+                       && boolValue;
+            }
+        }
+        set
+        {
+            lock (_syncLock)
+            {
+                _localSettings.Values[KeyLlmAutoExecute] = value;
+            }
+        }
+    }
+
     #endregion
 
     #region 语言指令配置
@@ -1075,9 +1202,36 @@ public static class Config
             _localSettings.Values[KeyLlmModel] = DefaultLlmModel;
             _localSettings.Values[KeyLlmMaxTokens] = DefaultLlmMaxTokens;
             _localSettings.Values[KeyLlmTimeoutSeconds] = DefaultLlmTimeoutSeconds;
+            _localSettings.Values[KeyLlmLanguagePreference] = DefaultLlmLanguagePreference;
+            _localSettings.Values[KeyLlmAdditionalPrompt] = string.Empty;
+            _localSettings.Values[KeyLlmDoubleCheck] = false;
+            _localSettings.Values[KeyLlmAutoExecute] = false;
             _languageCommands = CreateDefaultLanguageCommands();
             _languageCommandsLoaded = true;
             PersistLanguageCommands();
+        }
+    }
+
+    /// <summary>
+    /// 将所有 LLM 相关设置重置为默认值。
+    /// </summary>
+    /// <remarks>
+    /// 包括 API Key、基础 URL、模型名称、最大 Token 数、请求超时、
+    /// 语言偏好、附加提示词、二次校对与自动执行。重置后立即持久化。
+    /// </remarks>
+    public static void ResetLlmSettings()
+    {
+        lock (_syncLock)
+        {
+            _localSettings.Values[KeyLlmApiKey] = string.Empty;
+            _localSettings.Values[KeyLlmBaseUrl] = DefaultLlmBaseUrl;
+            _localSettings.Values[KeyLlmModel] = DefaultLlmModel;
+            _localSettings.Values[KeyLlmMaxTokens] = DefaultLlmMaxTokens;
+            _localSettings.Values[KeyLlmTimeoutSeconds] = DefaultLlmTimeoutSeconds;
+            _localSettings.Values[KeyLlmLanguagePreference] = DefaultLlmLanguagePreference;
+            _localSettings.Values[KeyLlmAdditionalPrompt] = string.Empty;
+            _localSettings.Values[KeyLlmDoubleCheck] = false;
+            _localSettings.Values[KeyLlmAutoExecute] = false;
         }
     }
 

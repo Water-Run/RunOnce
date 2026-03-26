@@ -49,6 +49,25 @@ public partial class App : Application
     public bool IsLlmMode { get; private set; }
 
     /// <summary>
+    /// 尝试消费一次 LLM 启动模式标志，避免重复触发自动生成功能。
+    /// </summary>
+    /// <returns>当本次调用成功消费标志并将其重置为 false 时返回 true；否则返回 false。</returns>
+    /// <remarks>
+    /// 线程安全：该方法设计为在 UI 线程调用。
+    /// 副作用：当返回 true 时会将 <see cref="IsLlmMode"/> 从 true 改写为 false。
+    /// </remarks>
+    public bool TryConsumeLlmMode()
+    {
+        if (!IsLlmMode)
+        {
+            return false;
+        }
+
+        IsLlmMode = false;
+        return true;
+    }
+
+    /// <summary>
     /// 初始化应用程序实例。
     /// </summary>
     public App()

@@ -48,6 +48,9 @@
         <KeyboardAccelerator Key="L"
                              Modifiers="Control"
                              Invoked="LlmGenerateAccelerator_Invoked"/>
+        <KeyboardAccelerator Key="S"
+                             Modifiers="Control"
+                             Invoked="SettingsAccelerator_Invoked"/>
     </Page.KeyboardAccelerators>
 
     <Grid Background="Transparent">
@@ -148,3 +151,4 @@
         </Grid>
     </Grid>
 </Page>
+    

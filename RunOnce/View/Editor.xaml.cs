@@ -1,6 +1,6 @@
 /*
  * 代码编辑器页面视图
- * 提供代码编辑、视窗语法高亮、渐进式语言检测、自定义右键菜单、命令行参数与脚本执行的 View 层实现
+ * 提供代码编辑、视窗语法高亮、渐进式语言检测、自定义右键菜单、命令行参数、LLM 代码生成与脚本执行的 View 层实现
  *
  * @author: WaterRun
  * @file: View/Editor.xaml.cs
@@ -16,6 +16,7 @@ using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Controls.Primitives;
 using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media;
+using Microsoft.UI.Xaml.Navigation;
 using RunOnce.Static;
 using RunOnce.ViewModel;
 using System;
@@ -35,7 +36,7 @@ using TextGetOptions = Microsoft.UI.Text.TextGetOptions;
 namespace RunOnce.View;
 
 /// <summary>
-/// 代码编辑器页面，提供代码编辑、视窗语法高亮、渐进式语言检测、自定义右键菜单、命令行参数与执行功能。
+/// 代码编辑器页面，提供代码编辑、视窗语法高亮、渐进式语言检测、自定义右键菜单、命令行参数、LLM 代码生成与执行功能。
 /// </summary>
 /// <remarks>
 /// 不变量：<see cref="ViewModel"/> 在构造时创建，生命周期与页面一致；
@@ -115,6 +116,11 @@ public sealed partial class Editor : Page
     private int _lastHighlightRangeEnd = -1;
 
     /// <summary>
+    /// 标识一次性初始化（定时器、ScrollViewer、右键菜单等）是否已完成。
+    /// </summary>
+    private bool _isInitialized;
+
+    /// <summary>
     /// 初始化编辑器页面实例，创建 ViewModel 并注册页面级事件。
     /// </summary>
     public Editor()
@@ -126,25 +132,53 @@ public sealed partial class Editor : Page
     }
 
     /// <summary>
-    /// 处理页面加载完成事件，完成定时器、滚动监听、右键菜单等初始化工作。
+    /// 处理页面加载完成事件，完成定时器、滚动监听、右键菜单等一次性初始化工作，并处理 LLM 启动模式。
     /// </summary>
     /// <param name="sender">事件源。</param>
     /// <param name="e">事件参数。</param>
     private void OnPageLoaded(object sender, RoutedEventArgs e)
     {
-        EnsureTimerInitialized();
-        CacheScrollViewer();
-        RegisterContextRequestedHandler();
-        RegisterScrollViewerEvents();
-        InitializeWorkingDirectory();
+        if (!_isInitialized)
+        {
+            _isInitialized = true;
+            EnsureTimerInitialized();
+            CacheScrollViewer();
+            RegisterContextRequestedHandler();
+            RegisterScrollViewerEvents();
+            InitializeWorkingDirectory();
+        }
+
         UpdatePlaceholderText();
         UpdatePlaceholderVisibility();
         CodeEditor.Focus(FocusState.Programmatic);
 
-        if (Application.Current is App { IsLlmMode: true })
+        if (Application.Current is App app && app.TryConsumeLlmMode())
         {
             _ = HandleLlmGenerateAsync();
         }
+    }
+
+    /// <summary>
+    /// 处理页面导航进入事件，消费跨页面延迟标志并刷新本地化文本。
+    /// </summary>
+    /// <param name="e">导航事件参数。</param>
+    /// <remarks>
+    /// 由于 <see cref="NavigationCacheMode"/> 为 <c>Required</c>，页面实例在导航后仍然存活，
+    /// <see cref="OnNavigatedTo"/> 在每次导航进入时均被调用，用于消费 <see cref="Settings.PendingEditorClear"/> 标志
+    /// 并同步因设置变更而需要更新的本地化文本与占位符可见性。
+    /// </remarks>
+    protected override void OnNavigatedTo(NavigationEventArgs e)
+    {
+        base.OnNavigatedTo(e);
+
+        if (Settings.PendingEditorClear)
+        {
+            Settings.PendingEditorClear = false;
+            ClearAllContent();
+        }
+
+        RefreshLocalizedTexts();
+        UpdatePlaceholderVisibility();
     }
 
     /// <summary>
@@ -657,7 +691,7 @@ public sealed partial class Editor : Page
     #region 键盘处理
 
     /// <summary>
-    /// 处理编辑器的按键预览事件，拦截 Ctrl+Enter、Ctrl+E、Ctrl+L、Ctrl+B/I/U 和 Tab 键。
+    /// 处理编辑器的按键预览事件，拦截 Ctrl+Enter、Ctrl+E、Ctrl+L、Ctrl+S、Ctrl+B/I/U 和 Tab 键。
     /// </summary>
     /// <param name="sender">事件源。</param>
     /// <param name="e">按键路由事件参数。</param>
@@ -686,6 +720,13 @@ public sealed partial class Editor : Page
             {
                 e.Handled = true;
                 _ = HandleLlmGenerateAsync();
+                return;
+            }
+
+            if (e.Key == VirtualKey.S)
+            {
+                e.Handled = true;
+                NavigateToSettings();
                 return;
             }
 
@@ -745,6 +786,17 @@ public sealed partial class Editor : Page
     {
         args.Handled = true;
         _ = HandleLlmGenerateAsync();
+    }
+
+    /// <summary>
+    /// 处理 Ctrl+S 快捷键（Page 级后备），导航到设置页面。
+    /// </summary>
+    /// <param name="sender">触发快捷键的加速器。</param>
+    /// <param name="args">快捷键调用事件参数。</param>
+    private void SettingsAccelerator_Invoked(KeyboardAccelerator sender, KeyboardAcceleratorInvokedEventArgs args)
+    {
+        args.Handled = true;
+        NavigateToSettings();
     }
 
     /// <summary>
@@ -1008,11 +1060,12 @@ public sealed partial class Editor : Page
     #region LLM 生成代码
 
     /// <summary>
-    /// 显示 LLM 代码生成对话框，允许用户输入需求描述，调用 LLM 生成并加载脚本代码。
+    /// 处理 LLM 代码生成完整流程：API Key 校验 → 生成对话框 → 可选二次校对 → 加载编辑器 → 可选自动执行。
     /// </summary>
     /// <returns>表示异步生成流程的任务。</returns>
     /// <remarks>
-    /// 完成语义：对话框关闭后任务完成；通过 <see cref="_isLlmGenerating"/> 防止重入。
+    /// 完成语义：流程结束后任务完成；通过 <see cref="_isLlmGenerating"/> 防止重入。
+    /// 涉及 I/O：通过 <see cref="LlmClient"/> 发起网络请求。
     /// </remarks>
     public async Task HandleLlmGenerateAsync()
     {
@@ -1025,7 +1078,33 @@ public sealed partial class Editor : Page
 
         try
         {
-            await ShowLlmGenerateDialogAsync();
+            if (string.IsNullOrEmpty(Config.LlmApiKey))
+            {
+                await OfferNavigateToLlmSettingsAsync();
+                return;
+            }
+
+            string? code = await ShowLlmGenerateDialogAsync();
+            if (string.IsNullOrEmpty(code))
+            {
+                return;
+            }
+
+            if (Config.LlmDoubleCheck)
+            {
+                code = await ShowLlmReviewDialogAsync(code);
+                if (string.IsNullOrEmpty(code))
+                {
+                    return;
+                }
+            }
+
+            LoadCodeIntoEditor(code);
+
+            if (Config.LlmAutoExecute)
+            {
+                HandleExecuteRequest();
+            }
         }
         finally
         {
@@ -1034,14 +1113,44 @@ public sealed partial class Editor : Page
     }
 
     /// <summary>
-    /// 构建并显示 LLM 生成对话框，执行生成流程。
+    /// 当 API Key 未配置时弹出引导对话框，允许用户选择前往设置页面进行配置。
     /// </summary>
     /// <returns>表示异步对话框操作的任务。</returns>
     /// <remarks>
-    /// 完成语义：对话框关闭并将生成结果（若有）加载到编辑器后任务完成。
+    /// 完成语义：对话框关闭后任务完成；若用户确认则设置 <see cref="Settings.PendingScrollToLlm"/> 并导航至设置页。
+    /// </remarks>
+    private async Task OfferNavigateToLlmSettingsAsync()
+    {
+        if (XamlRoot is null)
+        {
+            return;
+        }
+
+        ContentDialog dialog = new()
+        {
+            Title = Text.Localize("大模型未配置"),
+            Content = Text.Localize("尚未配置 API Key，是否前往设置页面进行配置？"),
+            PrimaryButtonText = Text.Localize("前往设置"),
+            CloseButtonText = Text.Localize("取消"),
+            DefaultButton = ContentDialogButton.Primary,
+            XamlRoot = XamlRoot,
+        };
+
+        if (await dialog.ShowAsync() is ContentDialogResult.Primary)
+        {
+            NavigateToSettings(scrollToLlm: true);
+        }
+    }
+
+    /// <summary>
+    /// 构建并显示 LLM 生成对话框，执行生成流程并返回生成的代码文本。
+    /// </summary>
+    /// <returns>生成的代码文本；若用户取消或生成失败后关闭对话框则返回 null。</returns>
+    /// <remarks>
+    /// 完成语义：对话框关闭后返回结果。
     /// 涉及 I/O：通过 <see cref="LlmClient"/> 发起网络请求。
     /// </remarks>
-    private async Task ShowLlmGenerateDialogAsync()
+    private async Task<string?> ShowLlmGenerateDialogAsync()
     {
         StackPanel contentPanel = new() { Spacing = 12, MinWidth = 480 };
 
@@ -1069,10 +1178,26 @@ public sealed partial class Editor : Page
 
         List<string> langOptions = [Text.Localize("自动"), .. Config.SupportedLanguages.Select(l => l.ToUpperInvariant())];
 
+        int preSelectLangIndex = 0;
+        if (!string.IsNullOrEmpty(Config.LlmLanguagePreference))
+        {
+            int preferredIndex = Config.SupportedLanguages
+                .Select((language, index) => new { language, index })
+                .Where(x => string.Equals(x.language, Config.LlmLanguagePreference, StringComparison.OrdinalIgnoreCase))
+                .Select(x => x.index)
+                .DefaultIfEmpty(-1)
+                .First();
+
+            if (preferredIndex >= 0)
+            {
+                preSelectLangIndex = preferredIndex + 1;
+            }
+        }
+
         ComboBox langBox = new()
         {
             ItemsSource = langOptions,
-            SelectedIndex = 0,
+            SelectedIndex = preSelectLangIndex,
             MinWidth = 130,
             VerticalAlignment = VerticalAlignment.Center,
         };
@@ -1097,7 +1222,7 @@ public sealed partial class Editor : Page
 
         TextBlock errorText = new()
         {
-            Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 196, 43, 28)),
+            Foreground = new SolidColorBrush(Color.FromArgb(255, 196, 43, 28)),
             TextWrapping = TextWrapping.Wrap,
             Visibility = Visibility.Collapsed,
         };
@@ -1159,10 +1284,72 @@ public sealed partial class Editor : Page
         cts?.Dispose();
         cts = null;
 
-        if (!string.IsNullOrEmpty(generatedCode))
+        return generatedCode;
+    }
+
+    /// <summary>
+    /// 显示 LLM 生成结果的二次校对对话框，允许用户审查与编辑代码后决定是否采纳。
+    /// </summary>
+    /// <param name="code">LLM 生成的原始代码文本，非空。</param>
+    /// <returns>用户确认后的代码文本（可能已编辑）；若用户放弃则返回 null。</returns>
+    /// <remarks>
+    /// 完成语义：对话框关闭后返回结果，不修改编辑器状态。
+    /// 设计决策 DECISION-LLM-REVIEW-001：代码框可编辑，允许用户在采纳前做细微调整。
+    /// </remarks>
+    private async Task<string?> ShowLlmReviewDialogAsync(string code)
+    {
+        if (XamlRoot is null)
         {
-            LoadCodeIntoEditor(generatedCode);
+            return null;
         }
+
+        StackPanel panel = new() { Spacing = 12, MinWidth = 500 };
+
+        panel.Children.Add(new TextBlock
+        {
+            Text = Text.Localize("请检查生成的代码是否符合预期："),
+            TextWrapping = TextWrapping.Wrap,
+            Style = (Style)Application.Current.Resources["CaptionTextBlockStyle"],
+            Foreground = (Brush)Application.Current.Resources["TextFillColorSecondaryBrush"],
+        });
+
+        TextBox codeBox = new()
+        {
+            Text = code,
+            AcceptsReturn = true,
+            TextWrapping = TextWrapping.NoWrap,
+            FontFamily = new FontFamily("Cascadia Code, Cascadia Mono, Consolas, Courier New, monospace"),
+            FontSize = 13,
+            IsReadOnly = false,
+            MinHeight = 150,
+        };
+        panel.Children.Add(codeBox);
+
+        ScrollViewer scrollViewer = new()
+        {
+            Content = panel,
+            VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+            HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
+            MaxHeight = Math.Max(250, XamlRoot.Size.Height - 200),
+        };
+
+        ContentDialog dialog = new()
+        {
+            Title = Text.Localize("代码审查"),
+            Content = scrollViewer,
+            PrimaryButtonText = Text.Localize("使用此代码"),
+            CloseButtonText = Text.Localize("放弃"),
+            DefaultButton = ContentDialogButton.Primary,
+            XamlRoot = XamlRoot,
+        };
+
+        if (await dialog.ShowAsync() is ContentDialogResult.Primary)
+        {
+            string reviewed = codeBox.Text;
+            return string.IsNullOrWhiteSpace(reviewed) ? null : reviewed;
+        }
+
+        return null;
     }
 
     /// <summary>
@@ -1560,6 +1747,31 @@ public sealed partial class Editor : Page
         ViewModel.ManualLanguage = null;
         ViewModel.UpdateCursorPosition(string.Empty, 0);
         UpdatePlaceholderVisibility();
+    }
+
+    #endregion
+
+    #region 导航辅助
+
+    /// <summary>
+    /// 通知 MainWindow 导航到设置页面，可选滚动到 LLM 设置区域。
+    /// </summary>
+    /// <param name="scrollToLlm">是否在设置页加载后自动滚动到大模型设置区域。</param>
+    /// <remarks>
+    /// 通过 <see cref="Settings.PendingScrollToLlm"/> 静态标志进行跨页面延迟通信，
+    /// 设置页在 <see cref="Settings.HandlePageLoaded"/> 中消费并复位该标志。
+    /// </remarks>
+    private static void NavigateToSettings(bool scrollToLlm = false)
+    {
+        if (scrollToLlm)
+        {
+            Settings.PendingScrollToLlm = true;
+        }
+
+        if (Application.Current is App { MainWindow: MainWindow mw })
+        {
+            mw.NavigateToSettingsPublic();
+        }
     }
 
     #endregion

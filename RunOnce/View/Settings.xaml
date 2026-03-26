@@ -56,7 +56,7 @@
         </Grid>
 
         <!-- 右侧设置内容区域 -->
-        <ScrollViewer Grid.Column="1" VerticalScrollBarVisibility="Auto" Padding="24,24,24,24">
+        <ScrollViewer x:Name="SettingsScrollViewer" Grid.Column="1" VerticalScrollBarVisibility="Auto" Padding="24,24,24,24">
             <StackPanel Spacing="2" HorizontalAlignment="Stretch">
 
                 <TextBlock x:Name="PageTitle" Style="{ThemeResource TitleTextBlockStyle}" Margin="0,0,0,20"/>
@@ -198,7 +198,7 @@
                 </Grid>
 
                 <!-- 高级设置 -->
-                <Grid Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1,0,1,1" CornerRadius="0" Padding="16,12,16,12" MinHeight="52">
+                <Grid Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1,0,1,1" CornerRadius="0,0,4,4" Padding="16,12,16,12" MinHeight="52">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*"/>
                         <ColumnDefinition Width="Auto"/>
@@ -210,17 +210,71 @@
                     <Button x:Name="AdvancedSettingsButton" Grid.Column="1" VerticalAlignment="Center" Click="AdvancedSettingsButton_Click"/>
                 </Grid>
 
-                <!-- LLM 设置 -->
-                <Grid Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1,0,1,1" CornerRadius="0,0,4,4" Padding="16,12,16,12" MinHeight="52">
+                <!-- ====== 大模型设置 ====== -->
+                <TextBlock x:Name="LlmSectionHeader" Style="{ThemeResource BodyStrongTextBlockStyle}" Margin="0,20,0,4"/>
+
+                <!-- API Key -->
+                <Grid Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="4,4,0,0" Padding="16,12,16,12" MinHeight="60">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*"/>
                         <ColumnDefinition Width="Auto"/>
                     </Grid.ColumnDefinitions>
                     <StackPanel Grid.Column="0" VerticalAlignment="Center">
-                        <TextBlock x:Name="LlmSettingsLabel" Style="{ThemeResource BodyTextBlockStyle}"/>
-                        <TextBlock x:Name="LlmSettingsDescription" Style="{ThemeResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+                        <TextBlock x:Name="LlmApiKeyLabel" Style="{ThemeResource BodyTextBlockStyle}"/>
                     </StackPanel>
-                    <Button x:Name="LlmSettingsButton" Grid.Column="1" VerticalAlignment="Center" Click="LlmSettingsButton_Click"/>
+                    <PasswordBox x:Name="LlmApiKeyBox" Grid.Column="1" MinWidth="220" VerticalAlignment="Center" PasswordChanged="LlmApiKeyBox_PasswordChanged"/>
+                </Grid>
+
+                <!-- API 基础 URL -->
+                <Grid Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1,0,1,1" CornerRadius="0" Padding="16,12,16,12" MinHeight="60">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                        <TextBlock x:Name="LlmBaseUrlLabel" Style="{ThemeResource BodyTextBlockStyle}"/>
+                    </StackPanel>
+                    <TextBox x:Name="LlmBaseUrlBox" Grid.Column="1" MinWidth="220" VerticalAlignment="Center" LostFocus="LlmBaseUrlBox_LostFocus"/>
+                </Grid>
+
+                <!-- 模型名称 -->
+                <Grid Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1,0,1,1" CornerRadius="0" Padding="16,12,16,12" MinHeight="60">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                        <TextBlock x:Name="LlmModelLabel" Style="{ThemeResource BodyTextBlockStyle}"/>
+                    </StackPanel>
+                    <TextBox x:Name="LlmModelBox" Grid.Column="1" MinWidth="220" VerticalAlignment="Center" LostFocus="LlmModelBox_LostFocus"/>
+                </Grid>
+
+                <!-- 验证连接 -->
+                <Grid Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1,0,1,1" CornerRadius="0" Padding="16,12,16,12" MinHeight="52">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <TextBlock x:Name="LlmVerifyStatus" Grid.Column="0" Style="{ThemeResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" VerticalAlignment="Center"/>
+                    <Button x:Name="LlmVerifyButton" Grid.Column="1" VerticalAlignment="Center" Click="LlmVerifyButton_Click"/>
+                </Grid>
+
+                <!-- LLM 高级设置 -->
+                <Grid Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1,0,1,1" CornerRadius="0" Padding="16,12,16,12" MinHeight="52">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                        <TextBlock x:Name="LlmAdvancedLabel" Style="{ThemeResource BodyTextBlockStyle}"/>
+                        <TextBlock x:Name="LlmAdvancedDescription" Style="{ThemeResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+                    </StackPanel>
+                    <Button x:Name="LlmAdvancedButton" Grid.Column="1" VerticalAlignment="Center" Click="LlmAdvancedButton_Click"/>
+                </Grid>
+
+                <!-- 重置大模型设置 -->
+                <Grid Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1,0,1,1" CornerRadius="0,0,4,4" Padding="16,12,16,12" MinHeight="44">
+                    <HyperlinkButton x:Name="LlmResetLink" Padding="0" VerticalAlignment="Center" HorizontalAlignment="Right" Click="LlmResetLink_Click"/>
                 </Grid>
 
                 <!-- ====== 窄屏关于区域 ====== -->

@@ -39,6 +39,19 @@ public sealed partial class Settings : Page
     public SettingsViewModel ViewModel { get; }
 
     /// <summary>
+    /// 标识是否存在待处理的编辑器内容清空请求，由 <see cref="ClearEditorContent"/> 置为 <see langword="true"/>，
+    /// 由编辑器页面在下次激活时消费并复位为 <see langword="false"/>；可变，非缓存，仅在 UI 线程上读写。
+    /// </summary>
+    internal static bool PendingEditorClear;
+
+    /// <summary>
+    /// 标识是否存在待处理的滚动到 LLM 设置区域的请求。
+    /// 由编辑器页面"前往设置"功能置为 <see langword="true"/>，
+    /// 由本页面在 <see cref="HandlePageLoaded"/> 中消费并复位。
+    /// </summary>
+    internal static bool PendingScrollToLlm;
+
+    /// <summary>
     /// 初始化设置页面实例，创建 <see cref="ViewModel"/> 并注册所有 ViewModel 事件回调。
     /// </summary>
     public Settings()
@@ -53,7 +66,7 @@ public sealed partial class Settings : Page
     }
 
     /// <summary>
-    /// 处理页面加载完成事件，依次执行本地化文本应用与商店行可见性刷新。
+    /// 处理页面加载完成事件，依次执行本地化文本应用、商店行可见性刷新与待处理的滚动请求。
     /// </summary>
     /// <param name="sender">事件发送方，通常为当前页面实例，非空。</param>
     /// <param name="e">路由事件参数，非空。</param>
@@ -61,6 +74,12 @@ public sealed partial class Settings : Page
     {
         ApplyLocalizedTexts();
         RefreshStoreRowVisibility();
+
+        if (PendingScrollToLlm)
+        {
+            PendingScrollToLlm = false;
+            LlmSectionHeader.StartBringIntoView(new BringIntoViewOptions { AnimationDesired = true });
+        }
     }
 
     #region 事件回调
@@ -194,18 +213,12 @@ public sealed partial class Settings : Page
         PendingEditorClear = true;
     }
 
-    /// <summary>
-    /// 标识是否存在待处理的编辑器内容清空请求，由 <see cref="ClearEditorContent"/> 置为 <see langword="true"/>，
-    /// 由编辑器页面在下次激活时消费并复位为 <see langword="false"/>；可变，非缓存，仅在 UI 线程上读写。
-    /// </summary>
-    internal static bool PendingEditorClear;
-
     #endregion
 
     #region 本地化文本
 
     /// <summary>
-    /// 将页面所有 UI 控件的文本内容更新为当前语言的本地化字符串，并调用宽屏与窄屏布局的子更新方法。
+    /// 将页面所有 UI 控件的文本内容更新为当前语言的本地化字符串，并调用各子区域的更新方法。
     /// </summary>
     private void ApplyLocalizedTexts()
     {
@@ -239,12 +252,35 @@ public sealed partial class Settings : Page
         AdvancedSettingsLabel.Text = Text.Localize("高级设置");
         AdvancedSettingsDescription.Text = Text.Localize("配置临时文件、置信度阈值和语言命令");
         AdvancedSettingsButton.Content = Text.Localize("打开");
-        LlmSettingsLabel.Text = Text.Localize("大模型设置");
-        LlmSettingsDescription.Text = Text.Localize("配置 LLM API 以生成脚本代码");
-        LlmSettingsButton.Content = Text.Localize("打开");
 
+        ApplyLlmLocalizedTexts();
         ApplyWideLocalizedTexts();
         ApplyNarrowAboutLocalizedTexts();
+    }
+
+    /// <summary>
+    /// 更新 LLM 设置区域的本地化文本并从 Config 初始化输入控件值。
+    /// </summary>
+    private void ApplyLlmLocalizedTexts()
+    {
+        LlmSectionHeader.Text = Text.Localize("大模型");
+        LlmApiKeyLabel.Text = Text.Localize("API Key");
+        LlmBaseUrlLabel.Text = Text.Localize("API 基础 URL");
+        LlmModelLabel.Text = Text.Localize("模型名称");
+        LlmVerifyButton.Content = Text.Localize("验证连接");
+        LlmVerifyStatus.Text = LlmClient.IsConnectionVerified
+            ? Text.Localize("连接验证成功")
+            : Text.Localize("未验证");
+        LlmAdvancedLabel.Text = Text.Localize("LLM 高级设置");
+        LlmAdvancedDescription.Text = Text.Localize("配置语言偏好、附加提示词与校对选项");
+        LlmAdvancedButton.Content = Text.Localize("打开");
+        LlmResetLink.Content = Text.Localize("重置大模型设置");
+
+        LlmApiKeyBox.Password = Config.LlmApiKey;
+        LlmBaseUrlBox.Text = Config.LlmBaseUrl;
+        LlmBaseUrlBox.PlaceholderText = Config.DefaultLlmBaseUrl;
+        LlmModelBox.Text = Config.LlmModel;
+        LlmModelBox.PlaceholderText = Config.DefaultLlmModel;
     }
 
     /// <summary>
@@ -315,6 +351,7 @@ public sealed partial class Settings : Page
 
         AddShortcutRow(panel, "Ctrl+Enter", Text.Localize("执行代码"));
         AddShortcutRow(panel, "Ctrl+L", Text.Localize("大模型生成代码"));
+        AddShortcutRow(panel, "Ctrl+S", Text.Localize("设置"));
         AddShortcutRow(panel, "Ctrl+E", Text.Localize("命令行参数"));
         AddShortcutRow(panel, "Ctrl+Y", Text.Localize("重做"));
         AddShortcutRow(panel, "Ctrl+A", Text.Localize("全选"));
@@ -582,6 +619,7 @@ public sealed partial class Settings : Page
         }
 
         ViewModel.ResetAllSettings();
+        LlmClient.ResetVerificationState();
 
         if (Application.Current is App app)
         {
@@ -594,10 +632,89 @@ public sealed partial class Settings : Page
 
     #endregion
 
-    #region LLM 设置对话框
+    #region LLM 设置
 
     /// <summary>
-    /// 处理"打开大模型设置"按钮点击事件，构建并异步显示大模型配置对话框。
+    /// 处理 API Key 输入变更事件，立即持久化到 Config 并重置验证状态。
+    /// </summary>
+    /// <param name="sender">事件发送方，通常为 <see cref="PasswordBox"/> 控件，非空。</param>
+    /// <param name="e">路由事件参数，非空。</param>
+    private void LlmApiKeyBox_PasswordChanged(object sender, RoutedEventArgs e)
+    {
+        Config.LlmApiKey = LlmApiKeyBox.Password;
+        LlmClient.ResetVerificationState();
+        LlmVerifyStatus.Text = Text.Localize("未验证");
+    }
+
+    /// <summary>
+    /// 处理 API 基础 URL 失焦事件，持久化到 Config 并重置验证状态。
+    /// </summary>
+    /// <param name="sender">事件发送方，通常为 <see cref="TextBox"/> 控件，非空。</param>
+    /// <param name="e">路由事件参数，非空。</param>
+    private void LlmBaseUrlBox_LostFocus(object sender, RoutedEventArgs e)
+    {
+        Config.LlmBaseUrl = string.IsNullOrWhiteSpace(LlmBaseUrlBox.Text)
+            ? Config.DefaultLlmBaseUrl
+            : LlmBaseUrlBox.Text;
+        LlmClient.ResetVerificationState();
+        LlmVerifyStatus.Text = Text.Localize("未验证");
+    }
+
+    /// <summary>
+    /// 处理模型名称失焦事件，持久化到 Config 并重置验证状态。
+    /// </summary>
+    /// <param name="sender">事件发送方，通常为 <see cref="TextBox"/> 控件，非空。</param>
+    /// <param name="e">路由事件参数，非空。</param>
+    private void LlmModelBox_LostFocus(object sender, RoutedEventArgs e)
+    {
+        Config.LlmModel = string.IsNullOrWhiteSpace(LlmModelBox.Text)
+            ? Config.DefaultLlmModel
+            : LlmModelBox.Text;
+        LlmClient.ResetVerificationState();
+        LlmVerifyStatus.Text = Text.Localize("未验证");
+    }
+
+    /// <summary>
+    /// 处理验证连接按钮点击事件，将当前输入持久化后异步验证 LLM API 连接可达性。
+    /// </summary>
+    /// <param name="sender">事件发送方，通常为触发点击的按钮控件，非空。</param>
+    /// <param name="e">路由事件参数，非空。</param>
+    /// <remarks>
+    /// 取消语义：无 <see cref="System.Threading.CancellationToken"/>，验证完成或异常后即结束。
+    /// 线程/重入：async void 事件处理器，仅在 UI 线程调用；验证期间禁用按钮防止重入。
+    /// </remarks>
+    private async void LlmVerifyButton_Click(object sender, RoutedEventArgs e)
+    {
+        Config.LlmApiKey = LlmApiKeyBox.Password;
+        Config.LlmBaseUrl = string.IsNullOrWhiteSpace(LlmBaseUrlBox.Text)
+            ? Config.DefaultLlmBaseUrl
+            : LlmBaseUrlBox.Text;
+        Config.LlmModel = string.IsNullOrWhiteSpace(LlmModelBox.Text)
+            ? Config.DefaultLlmModel
+            : LlmModelBox.Text;
+
+        LlmVerifyButton.IsEnabled = false;
+        LlmVerifyStatus.Text = Text.Localize("正在验证...");
+
+        try
+        {
+            bool ok = await LlmClient.VerifyConnectionAsync();
+            LlmVerifyStatus.Text = ok
+                ? Text.Localize("连接验证成功")
+                : Text.Localize("连接验证失败: {0}", "API returned error");
+        }
+        catch (Exception ex)
+        {
+            LlmVerifyStatus.Text = Text.Localize("连接验证失败: {0}", ex.Message);
+        }
+        finally
+        {
+            LlmVerifyButton.IsEnabled = true;
+        }
+    }
+
+    /// <summary>
+    /// 处理 LLM 高级设置按钮点击事件，构建并异步显示 LLM 高级设置对话框。
     /// </summary>
     /// <param name="sender">事件发送方，通常为触发点击的按钮控件，非空。</param>
     /// <param name="e">路由事件参数，非空。</param>
@@ -605,55 +722,79 @@ public sealed partial class Settings : Page
     /// 取消语义：无 <see cref="System.Threading.CancellationToken"/>，对话框关闭即完成，不可取消。
     /// 线程/重入：async void 事件处理器，仅在 UI 线程调用。
     /// </remarks>
-    private async void LlmSettingsButton_Click(object sender, RoutedEventArgs e)
+    private async void LlmAdvancedButton_Click(object sender, RoutedEventArgs e)
     {
-        ContentDialog dialog = BuildLlmSettingsDialog();
+        ContentDialog dialog = BuildLlmAdvancedDialog();
         await dialog.ShowAsync();
     }
 
     /// <summary>
-    /// 构建并返回包含 API Key、基础 URL、模型名称、最大 Token 数与请求超时配置控件的大模型设置 <see cref="ContentDialog"/>。
+    /// 构建并返回包含语言偏好、附加提示词、二次校对、自动执行、最大 Token 数与超时配置的 LLM 高级设置 <see cref="ContentDialog"/>。
     /// </summary>
-    /// <returns>已配置好内容区域、保存与取消按钮及配置写入逻辑的大模型设置对话框实例。</returns>
-    private ContentDialog BuildLlmSettingsDialog()
+    /// <returns>已配置好内容区域、保存与取消按钮及配置写入逻辑的 LLM 高级设置对话框实例。</returns>
+    private ContentDialog BuildLlmAdvancedDialog()
     {
-        StackPanel contentPanel = new() { Spacing = 16, MinWidth = 450, Margin = new Thickness(0, 0, 8, 0) };
+        StackPanel panel = new() { Spacing = 16, MinWidth = 450, Margin = new Thickness(0, 0, 8, 0) };
 
-        PasswordBox apiKeyBox = new()
+        List<string> langItems = Config.SupportedLanguages.Select(l => l.ToUpperInvariant()).ToList();
+        ComboBox langBox = new()
         {
-            Header = Text.Localize("API Key"),
-            PlaceholderText = Text.Localize("输入 API Key"),
-            Password = Config.LlmApiKey,
+            Header = Text.Localize("语言偏好"),
+            ItemsSource = langItems,
+            SelectedIndex = Math.Max(0, langItems.IndexOf(Config.LlmLanguagePreference.ToUpperInvariant())),
+            MinWidth = 200,
         };
-        contentPanel.Children.Add(apiKeyBox);
+        panel.Children.Add(langBox);
 
-        TextBox baseUrlBox = new()
+        TextBox promptBox = new()
         {
-            Header = Text.Localize("API 基础 URL"),
-            Text = Config.LlmBaseUrl,
-            PlaceholderText = Config.DefaultLlmBaseUrl,
+            Header = Text.Localize("附加提示词"),
+            Text = Config.LlmAdditionalPrompt,
+            AcceptsReturn = true,
+            TextWrapping = TextWrapping.Wrap,
+            MinHeight = 80,
+            MaxHeight = 160,
         };
-        contentPanel.Children.Add(baseUrlBox);
+        panel.Children.Add(promptBox);
 
-        TextBox modelBox = new()
+        ToggleSwitch doubleCheckSwitch = new()
         {
-            Header = Text.Localize("模型名称"),
-            Text = Config.LlmModel,
-            PlaceholderText = Config.DefaultLlmModel,
+            Header = Text.Localize("二次校对"),
+            IsOn = Config.LlmDoubleCheck,
+            OnContent = null,
+            OffContent = null,
         };
-        contentPanel.Children.Add(modelBox);
+        panel.Children.Add(doubleCheckSwitch);
+
+        ToggleSwitch autoExecSwitch = new()
+        {
+            Header = Text.Localize("自动立即执行"),
+            IsOn = Config.LlmAutoExecute,
+            IsEnabled = Config.LlmDoubleCheck,
+            OnContent = null,
+            OffContent = null,
+        };
+        doubleCheckSwitch.Toggled += (_, _) =>
+        {
+            autoExecSwitch.IsEnabled = doubleCheckSwitch.IsOn;
+            if (!doubleCheckSwitch.IsOn)
+            {
+                autoExecSwitch.IsOn = false;
+            }
+        };
+        panel.Children.Add(autoExecSwitch);
 
         NumberBox maxTokensBox = new()
         {
             Header = Text.Localize("最大 Token 数"),
             Value = Config.LlmMaxTokens,
             Minimum = 256,
-            Maximum = 32768,
-            SmallChange = 256,
-            LargeChange = 1024,
+            Maximum = 65536,
+            SmallChange = 1024,
+            LargeChange = 4096,
             SpinButtonPlacementMode = NumberBoxSpinButtonPlacementMode.Compact,
         };
-        contentPanel.Children.Add(maxTokensBox);
+        panel.Children.Add(maxTokensBox);
 
         NumberBox timeoutBox = new()
         {
@@ -665,7 +806,7 @@ public sealed partial class Settings : Page
             LargeChange = 30,
             SpinButtonPlacementMode = NumberBoxSpinButtonPlacementMode.Compact,
         };
-        contentPanel.Children.Add(timeoutBox);
+        panel.Children.Add(timeoutBox);
 
         HyperlinkButton resetLink = new()
         {
@@ -675,26 +816,18 @@ public sealed partial class Settings : Page
         };
         resetLink.Click += (_, _) =>
         {
-            apiKeyBox.Password = string.Empty;
-            baseUrlBox.Text = Config.DefaultLlmBaseUrl;
-            modelBox.Text = Config.DefaultLlmModel;
+            langBox.SelectedIndex = Math.Max(0, langItems.IndexOf(Config.DefaultLlmLanguagePreference.ToUpperInvariant()));
+            promptBox.Text = string.Empty;
+            doubleCheckSwitch.IsOn = false;
+            autoExecSwitch.IsOn = false;
             maxTokensBox.Value = Config.DefaultLlmMaxTokens;
             timeoutBox.Value = Config.DefaultLlmTimeoutSeconds;
         };
-        contentPanel.Children.Add(resetLink);
-
-        TextBlock errorText = new()
-        {
-            Foreground = new SolidColorBrush(Microsoft.UI.Colors.Red),
-            TextWrapping = TextWrapping.Wrap,
-            Visibility = Visibility.Collapsed,
-            Margin = new Thickness(0, 4, 0, 0),
-        };
-        contentPanel.Children.Add(errorText);
+        panel.Children.Add(resetLink);
 
         ScrollViewer scrollViewer = new()
         {
-            Content = contentPanel,
+            Content = panel,
             VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
             MaxHeight = Math.Max(200, XamlRoot.Size.Height - 200),
             Padding = new Thickness(0, 0, 16, 0),
@@ -702,7 +835,7 @@ public sealed partial class Settings : Page
 
         ContentDialog dialog = new()
         {
-            Title = Text.Localize("大模型设置"),
+            Title = Text.Localize("LLM 高级设置"),
             Content = scrollViewer,
             PrimaryButtonText = Text.Localize("保存"),
             CloseButtonText = Text.Localize("取消"),
@@ -710,36 +843,57 @@ public sealed partial class Settings : Page
             XamlRoot = XamlRoot,
         };
 
-        dialog.PrimaryButtonClick += (_, args) =>
+        dialog.PrimaryButtonClick += (_, _) =>
         {
-            errorText.Visibility = Visibility.Collapsed;
-            try
+            if (langBox.SelectedIndex >= 0 && langBox.SelectedIndex < Config.SupportedLanguages.Count)
             {
-                Config.LlmApiKey = apiKeyBox.Password;
-                Config.LlmBaseUrl = string.IsNullOrWhiteSpace(baseUrlBox.Text)
-                    ? Config.DefaultLlmBaseUrl
-                    : baseUrlBox.Text;
-                Config.LlmModel = string.IsNullOrWhiteSpace(modelBox.Text)
-                    ? Config.DefaultLlmModel
-                    : modelBox.Text;
-                if (!double.IsNaN(maxTokensBox.Value) && maxTokensBox.Value > 0)
-                {
-                    Config.LlmMaxTokens = (int)maxTokensBox.Value;
-                }
-                if (!double.IsNaN(timeoutBox.Value) && timeoutBox.Value > 0)
-                {
-                    Config.LlmTimeoutSeconds = (int)timeoutBox.Value;
-                }
+                Config.LlmLanguagePreference = Config.SupportedLanguages[langBox.SelectedIndex];
             }
-            catch (Exception ex)
+
+            Config.LlmAdditionalPrompt = promptBox.Text;
+            Config.LlmDoubleCheck = doubleCheckSwitch.IsOn;
+            Config.LlmAutoExecute = autoExecSwitch.IsOn;
+
+            if (!double.IsNaN(maxTokensBox.Value) && maxTokensBox.Value > 0)
             {
-                args.Cancel = true;
-                errorText.Text = ex.Message;
-                errorText.Visibility = Visibility.Visible;
+                Config.LlmMaxTokens = (int)maxTokensBox.Value;
+            }
+
+            if (!double.IsNaN(timeoutBox.Value) && timeoutBox.Value > 0)
+            {
+                Config.LlmTimeoutSeconds = (int)timeoutBox.Value;
             }
         };
 
         return dialog;
+    }
+
+    /// <summary>
+    /// 处理重置大模型设置链接点击事件，弹出确认对话框并在用户确认后重置所有 LLM 设置。
+    /// </summary>
+    /// <param name="sender">事件发送方，通常为超链接按钮控件，非空。</param>
+    /// <param name="e">路由事件参数，非空。</param>
+    /// <remarks>
+    /// 取消语义：无 <see cref="System.Threading.CancellationToken"/>，对话框关闭即结束，不可取消。
+    /// 线程/重入：async void 事件处理器，仅在 UI 线程调用；重置后刷新 LLM 区域本地化文本。
+    /// </remarks>
+    private async void LlmResetLink_Click(object sender, RoutedEventArgs e)
+    {
+        ContentDialog dialog = new()
+        {
+            Title = Text.Localize("重置大模型设置"),
+            Content = Text.Localize("确定要将所有设置重置为默认值吗？此操作无法撤销。"),
+            PrimaryButtonText = Text.Localize("重置"),
+            CloseButtonText = Text.Localize("取消"),
+            DefaultButton = ContentDialogButton.Close,
+            XamlRoot = XamlRoot,
+        };
+
+        if (await dialog.ShowAsync() is ContentDialogResult.Primary)
+        {
+            ViewModel.ResetLlmSettings();
+            ApplyLlmLocalizedTexts();
+        }
     }
 
     #endregion
