@@ -191,7 +191,6 @@ public static class Text
         ["描述你的需求"] = "Describe your requirements",
         ["例如：列出当前目录下所有.txt文件"] = "e.g.: List all .txt files in current directory",
         ["生成"] = "Generate",
-        ["自动"] = "Auto",
         ["大模型生成"] = "Model Generate",
         ["正在生成..."] = "Generating...",
 
@@ -217,15 +216,13 @@ public static class Text
         ["大模型"] = "LLM",
         ["验证连接"] = "Verify Connection",
         ["正在验证..."] = "Verifying...",
-        ["连接验证成功"] = "Connection verified",
-        ["连接验证失败: {0}"] = "Connection verification failed: {0}",
+        ["已验证"] = "Verified",
+        ["验证失败: {0}"] = "Verification failed: {0}",
         ["未验证"] = "Not verified",
-        ["LLM 高级设置"] = "LLM Advanced Settings",
         ["配置语言偏好、附加提示词与校对选项"] = "Configure language preference, additional prompt and verification options",
         ["语言偏好"] = "Language Preference",
         ["附加提示词"] = "Additional Prompt",
         ["附加提示词将自动加入生成请求"] = "Additional prompt will be automatically included in generation requests",
-        ["二次校对"] = "Double Check",
         ["生成后再次验证代码是否符合需求"] = "Verify generated code meets requirements after generation",
         ["自动立即执行"] = "Auto Execute",
         ["二次校对通过后自动执行生成的代码"] = "Auto-execute generated code after double check passes",
@@ -237,6 +234,8 @@ public static class Text
         ["大模型设置未配置。前往设置并验证连接后使用。"] = "LLM settings not configured. Go to Settings and verify connection first.",
         ["前往设置"] = "Go to Settings",
         ["校对未通过，代码已加载但未自动执行。"] = "Double check did not pass. Code loaded but not auto-executed.",
+        ["生成后二次校对"] = "Double Check After Generation",
+        ["换行"] = "new line",
     };
 
     /// <summary>

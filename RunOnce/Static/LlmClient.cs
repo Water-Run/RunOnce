@@ -43,14 +43,17 @@ public static class LlmClient
     /// <value>true 表示本次会话已成功验证过连接，false 表示未验证或验证失败。</value>
     public static bool IsConnectionVerified { get; private set; }
 
-    /// <summary>验证当前 LLM 配置的连接可达性，向 API 发送一次最小请求。</summary>
+    /// <summary>验证当前 LLM 配置的连接可达性，向 API 发送一次等价于实际生成的聊天请求。</summary>
     /// <param name="cancellationToken">取消令牌。</param>
-    /// <returns>验证成功返回 true，任何失败返回 false。</returns>
+    /// <returns>验证成功返回 true；API Key 为空时返回 false。</returns>
+    /// <exception cref="InvalidOperationException">当 API 返回错误时抛出，包含具体错误信息。</exception>
+    /// <exception cref="TimeoutException">当请求超时时抛出。</exception>
+    /// <exception cref="HttpRequestException">当网络传输失败时抛出。</exception>
     /// <exception cref="OperationCanceledException">当 <paramref name="cancellationToken"/> 被触发时抛出。</exception>
     /// <remarks>
-    /// 取消语义：支持通过 <paramref name="cancellationToken"/> 取消，超时为配置值。
+    /// 取消语义：支持通过 <paramref name="cancellationToken"/> 取消。
     /// 线程/重入：可安全并发调用。
-    /// I/O：向 <see cref="Config.LlmBaseUrl"/> 发起一次 HTTP POST 请求。
+    /// I/O：向 <see cref="Config.LlmBaseUrl"/> 发起一次 HTTP POST 请求，使用与 <see cref="GenerateScriptAsync"/> 相同的请求路径。
     /// </remarks>
     public static async Task<bool> VerifyConnectionAsync(CancellationToken cancellationToken = default)
     {
@@ -61,35 +64,23 @@ public static class LlmClient
             return false;
         }
 
-        string baseUrl = Config.LlmBaseUrl.TrimEnd('/');
-        var requestBody = new
-        {
-            model = Config.LlmModel,
-            messages = new[] { new { role = "user", content = "hi" } },
-            max_tokens = 1,
-        };
-
-        using var request = new HttpRequestMessage(HttpMethod.Post, $"{baseUrl}/chat/completions");
-        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
-        request.Content = new StringContent(
-            JsonSerializer.Serialize(requestBody), Encoding.UTF8, "application/json");
-
-        using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        timeoutCts.CancelAfter(TimeSpan.FromSeconds(Config.LlmTimeoutSeconds));
-
         try
         {
-            HttpResponseMessage response = await _httpClient
-                .SendAsync(request, timeoutCts.Token)
+            await SendChatRequestAsync(
+                    "Reply with the single word OK.",
+                    "hi",
+                    1024,
+                    Config.LlmTimeoutSeconds,
+                    cancellationToken)
                 .ConfigureAwait(false);
 
-            IsConnectionVerified = response.IsSuccessStatusCode;
-            return IsConnectionVerified;
+            IsConnectionVerified = true;
+            return true;
         }
-        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException)
+        catch
         {
             IsConnectionVerified = false;
-            return false;
+            throw;
         }
     }
 

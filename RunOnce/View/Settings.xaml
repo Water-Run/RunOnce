@@ -49,7 +49,7 @@
                     <TextBlock Text="·" Style="{ThemeResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" VerticalAlignment="Center"/>
                     <HyperlinkButton Content="GitHub" Padding="0" VerticalAlignment="Center" Click="GitHubLink_Click"/>
                 </StackPanel>
-                <TextBlock Text="{x:Bind ViewModel.BuildTimeText}" Style="{ThemeResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" HorizontalAlignment="Center"/>
+                <TextBlock x:Name="WideBuildTimeText" Style="{ThemeResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" HorizontalAlignment="Center"/>
                 <HyperlinkButton x:Name="WideStoreLink" Padding="0" HorizontalAlignment="Center" Click="StoreLink_Click"/>
             </StackPanel>
             <HyperlinkButton x:Name="WideResetLink" Grid.Row="1" Padding="0" HorizontalAlignment="Center" Click="ResetAllLink_Click"/>

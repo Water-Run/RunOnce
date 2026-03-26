@@ -203,6 +203,7 @@ public sealed partial class MainWindow : Window
         ToolTipService.SetToolTip(ArgsButton, $"{Text.Localize("命令行参数")} (Ctrl+E)");
         ToolTipService.SetToolTip(LlmButton, $"{Text.Localize("大模型生成代码")} (Ctrl+L)");
         ToolTipService.SetToolTip(RunButton, $"{Text.Localize("运行")} (Ctrl+Enter)");
+        ToolTipService.SetToolTip(SettingsButton, $"{Text.Localize("设置")} (Ctrl+S)");
     }
 
     /// <summary>

@@ -15,6 +15,7 @@ using System.Linq;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media;
+using Windows.UI;
 using RunOnce.Static;
 using RunOnce.ViewModel;
 using Windows.System;
@@ -268,10 +269,20 @@ public sealed partial class Settings : Page
         LlmBaseUrlLabel.Text = Text.Localize("API 基础 URL");
         LlmModelLabel.Text = Text.Localize("模型名称");
         LlmVerifyButton.Content = Text.Localize("验证连接");
-        LlmVerifyStatus.Text = LlmClient.IsConnectionVerified
-            ? Text.Localize("连接验证成功")
-            : Text.Localize("未验证");
-        LlmAdvancedLabel.Text = Text.Localize("LLM 高级设置");
+
+        if (LlmClient.IsConnectionVerified)
+        {
+            SetLlmVerifyStatus(
+                Text.Localize("已验证"),
+                new SolidColorBrush(Color.FromArgb(255, 16, 124, 16)));
+        }
+        else
+        {
+            LlmVerifyStatus.Foreground = (Brush)Application.Current.Resources["TextFillColorSecondaryBrush"];
+            LlmVerifyStatus.Text = Text.Localize("未验证");
+        }
+
+        LlmAdvancedLabel.Text = Text.Localize("高级设置");
         LlmAdvancedDescription.Text = Text.Localize("配置语言偏好、附加提示词与校对选项");
         LlmAdvancedButton.Content = Text.Localize("打开");
         LlmResetLink.Content = Text.Localize("重置大模型设置");
@@ -290,6 +301,7 @@ public sealed partial class Settings : Page
     {
         WideStoreLink.Content = Text.Localize("微软商店");
         WideResetLink.Content = Text.Localize("重置所有设置");
+        WideBuildTimeText.Text = $"{Text.Localize("编译于")} {ViewModel.BuildTimeText}";
     }
 
     /// <summary>
@@ -635,6 +647,17 @@ public sealed partial class Settings : Page
     #region LLM 设置
 
     /// <summary>
+    /// 更新 LLM 验证状态指示灯文本与颜色。
+    /// </summary>
+    /// <param name="text">状态描述文本，非空。</param>
+    /// <param name="foreground">指示灯与文本颜色画刷，非空。</param>
+    private void SetLlmVerifyStatus(string text, Brush foreground)
+    {
+        LlmVerifyStatus.Text = $"●  {text}";
+        LlmVerifyStatus.Foreground = foreground;
+    }
+
+    /// <summary>
     /// 处理 API Key 输入变更事件，立即持久化到 Config 并重置验证状态。
     /// </summary>
     /// <param name="sender">事件发送方，通常为 <see cref="PasswordBox"/> 控件，非空。</param>
@@ -643,6 +666,7 @@ public sealed partial class Settings : Page
     {
         Config.LlmApiKey = LlmApiKeyBox.Password;
         LlmClient.ResetVerificationState();
+        LlmVerifyStatus.Foreground = (Brush)Application.Current.Resources["TextFillColorSecondaryBrush"];
         LlmVerifyStatus.Text = Text.Localize("未验证");
     }
 
@@ -657,6 +681,7 @@ public sealed partial class Settings : Page
             ? Config.DefaultLlmBaseUrl
             : LlmBaseUrlBox.Text;
         LlmClient.ResetVerificationState();
+        LlmVerifyStatus.Foreground = (Brush)Application.Current.Resources["TextFillColorSecondaryBrush"];
         LlmVerifyStatus.Text = Text.Localize("未验证");
     }
 
@@ -671,6 +696,7 @@ public sealed partial class Settings : Page
             ? Config.DefaultLlmModel
             : LlmModelBox.Text;
         LlmClient.ResetVerificationState();
+        LlmVerifyStatus.Foreground = (Brush)Application.Current.Resources["TextFillColorSecondaryBrush"];
         LlmVerifyStatus.Text = Text.Localize("未验证");
     }
 
@@ -694,18 +720,29 @@ public sealed partial class Settings : Page
             : LlmModelBox.Text;
 
         LlmVerifyButton.IsEnabled = false;
+        LlmVerifyStatus.Foreground = (Brush)Application.Current.Resources["TextFillColorSecondaryBrush"];
         LlmVerifyStatus.Text = Text.Localize("正在验证...");
 
         try
         {
             bool ok = await LlmClient.VerifyConnectionAsync();
-            LlmVerifyStatus.Text = ok
-                ? Text.Localize("连接验证成功")
-                : Text.Localize("连接验证失败: {0}", "API returned error");
+            if (ok)
+            {
+                SetLlmVerifyStatus(
+                    Text.Localize("已验证"),
+                    new SolidColorBrush(Color.FromArgb(255, 16, 124, 16)));
+            }
+            else
+            {
+                LlmVerifyStatus.Foreground = (Brush)Application.Current.Resources["TextFillColorSecondaryBrush"];
+                LlmVerifyStatus.Text = Text.Localize("未验证");
+            }
         }
         catch (Exception ex)
         {
-            LlmVerifyStatus.Text = Text.Localize("连接验证失败: {0}", ex.Message);
+            SetLlmVerifyStatus(
+                Text.Localize("验证失败: {0}", ex.Message),
+                new SolidColorBrush(Color.FromArgb(255, 196, 43, 28)));
         }
         finally
         {
@@ -759,7 +796,7 @@ public sealed partial class Settings : Page
 
         ToggleSwitch doubleCheckSwitch = new()
         {
-            Header = Text.Localize("二次校对"),
+            Header = Text.Localize("生成后二次校对"),
             IsOn = Config.LlmDoubleCheck,
             OnContent = null,
             OffContent = null,
@@ -808,23 +845,6 @@ public sealed partial class Settings : Page
         };
         panel.Children.Add(timeoutBox);
 
-        HyperlinkButton resetLink = new()
-        {
-            Content = Text.Localize("重置为默认"),
-            Padding = new Thickness(0),
-            HorizontalAlignment = HorizontalAlignment.Right,
-        };
-        resetLink.Click += (_, _) =>
-        {
-            langBox.SelectedIndex = Math.Max(0, langItems.IndexOf(Config.DefaultLlmLanguagePreference.ToUpperInvariant()));
-            promptBox.Text = string.Empty;
-            doubleCheckSwitch.IsOn = false;
-            autoExecSwitch.IsOn = false;
-            maxTokensBox.Value = Config.DefaultLlmMaxTokens;
-            timeoutBox.Value = Config.DefaultLlmTimeoutSeconds;
-        };
-        panel.Children.Add(resetLink);
-
         ScrollViewer scrollViewer = new()
         {
             Content = panel,
@@ -835,7 +855,7 @@ public sealed partial class Settings : Page
 
         ContentDialog dialog = new()
         {
-            Title = Text.Localize("LLM 高级设置"),
+            Title = Text.Localize("高级设置"),
             Content = scrollViewer,
             PrimaryButtonText = Text.Localize("保存"),
             CloseButtonText = Text.Localize("取消"),

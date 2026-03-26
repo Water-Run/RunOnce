@@ -1060,7 +1060,7 @@ public sealed partial class Editor : Page
     #region LLM 生成代码
 
     /// <summary>
-    /// 处理 LLM 代码生成完整流程：API Key 校验 → 生成对话框 → 可选二次校对 → 加载编辑器 → 可选自动执行。
+    /// 处理 LLM 代码生成完整流程：API Key 校验 → 覆盖确认 → 生成对话框 → 可选二次校对 → 加载编辑器 → 可选自动执行。
     /// </summary>
     /// <returns>表示异步生成流程的任务。</returns>
     /// <remarks>
@@ -1082,6 +1082,25 @@ public sealed partial class Editor : Page
             {
                 await OfferNavigateToLlmSettingsAsync();
                 return;
+            }
+
+            string existingContent = GetPlainText();
+            if (!string.IsNullOrEmpty(existingContent))
+            {
+                ContentDialog overwriteDialog = new()
+                {
+                    Title = Text.Localize("大模型生成代码"),
+                    Content = Text.Localize("将覆盖编辑器中的现有内容，继续吗？"),
+                    PrimaryButtonText = Text.Localize("继续"),
+                    CloseButtonText = Text.Localize("取消"),
+                    DefaultButton = ContentDialogButton.Close,
+                    XamlRoot = XamlRoot,
+                };
+
+                if (await overwriteDialog.ShowAsync() is not ContentDialogResult.Primary)
+                {
+                    return;
+                }
             }
 
             string? code = await ShowLlmGenerateDialogAsync();
@@ -1158,9 +1177,21 @@ public sealed partial class Editor : Page
         {
             Header = Text.Localize("描述你的需求"),
             PlaceholderText = Text.Localize("例如：列出当前目录下所有.txt文件"),
-            AcceptsReturn = false,
+            AcceptsReturn = true,
+            TextWrapping = TextWrapping.Wrap,
+            MinHeight = 80,
+            MaxHeight = 160,
         };
         contentPanel.Children.Add(promptBox);
+
+        contentPanel.Children.Add(new TextBlock
+        {
+            Text = "Shift+Enter " + Text.Localize("换行"),
+            Style = (Style)Application.Current.Resources["CaptionTextBlockStyle"],
+            Foreground = (Brush)Application.Current.Resources["TextFillColorSecondaryBrush"],
+            Opacity = 0.6,
+            Margin = new Thickness(0, -8, 0, 0),
+        });
 
         StackPanel langRow = new()
         {
@@ -1176,23 +1207,14 @@ public sealed partial class Editor : Page
             Style = (Style)Application.Current.Resources["BodyTextBlockStyle"],
         });
 
-        List<string> langOptions = [Text.Localize("自动"), .. Config.SupportedLanguages.Select(l => l.ToUpperInvariant())];
+        List<string> langOptions = [.. Config.SupportedLanguages.Select(l => l.ToUpperInvariant())];
 
-        int preSelectLangIndex = 0;
-        if (!string.IsNullOrEmpty(Config.LlmLanguagePreference))
-        {
-            int preferredIndex = Config.SupportedLanguages
-                .Select((language, index) => new { language, index })
-                .Where(x => string.Equals(x.language, Config.LlmLanguagePreference, StringComparison.OrdinalIgnoreCase))
-                .Select(x => x.index)
-                .DefaultIfEmpty(-1)
-                .First();
-
-            if (preferredIndex >= 0)
-            {
-                preSelectLangIndex = preferredIndex + 1;
-            }
-        }
+        int preSelectLangIndex = Config.SupportedLanguages
+            .Select((language, index) => new { language, index })
+            .Where(x => string.Equals(x.language, Config.LlmLanguagePreference, StringComparison.OrdinalIgnoreCase))
+            .Select(x => x.index)
+            .DefaultIfEmpty(0)
+            .First();
 
         ComboBox langBox = new()
         {
@@ -1261,20 +1283,26 @@ public sealed partial class Editor : Page
 
         dialog.CloseButtonClick += (_, _) => cts?.Cancel();
 
-        promptBox.KeyDown += (_, keyArgs) =>
+        promptBox.PreviewKeyDown += (_, keyArgs) =>
         {
             if (keyArgs.Key == VirtualKey.Enter)
             {
-                keyArgs.Handled = true;
-                string prompt = promptBox.Text.Trim();
-                if (!string.IsNullOrWhiteSpace(prompt) && dialog.IsPrimaryButtonEnabled)
+                CoreVirtualKeyStates shiftState = InputKeyboardSource.GetKeyStateForCurrentThread(VirtualKey.Shift);
+                bool isShift = (shiftState & CoreVirtualKeyStates.Down) != 0;
+
+                if (!isShift)
                 {
-                    cts?.Dispose();
-                    cts = new CancellationTokenSource();
-                    _ = RunGenerationAsync(
-                        dialog, promptBox, langBox, progressRow, errorText,
-                        code => { generatedCode = code; },
-                        cts);
+                    keyArgs.Handled = true;
+                    string prompt = promptBox.Text.Trim();
+                    if (!string.IsNullOrWhiteSpace(prompt) && dialog.IsPrimaryButtonEnabled)
+                    {
+                        cts?.Dispose();
+                        cts = new CancellationTokenSource();
+                        _ = RunGenerationAsync(
+                            dialog, promptBox, langBox, progressRow, errorText,
+                            code => { generatedCode = code; },
+                            cts);
+                    }
                 }
             }
         };
@@ -1412,9 +1440,9 @@ public sealed partial class Editor : Page
         progressRow.Visibility = Visibility.Visible;
         errorText.Visibility = Visibility.Collapsed;
 
-        string? preferredLanguage = langBox.SelectedIndex > 0
-            ? Config.SupportedLanguages[langBox.SelectedIndex - 1]
-            : null;
+        string? preferredLanguage = langBox.SelectedIndex >= 0 && langBox.SelectedIndex < Config.SupportedLanguages.Count
+            ? Config.SupportedLanguages[langBox.SelectedIndex]
+            : Config.LlmLanguagePreference;
 
         try
         {
