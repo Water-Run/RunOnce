@@ -66,6 +66,11 @@
                 Id="RunOnceHere"
                 Clsid="D4E5F601-A2B3-4C5D-8E9F-0A1B2C3D4E5F" />
             </desktop5:ItemType>
+            <desktop5:ItemType Type="Directory">
+              <desktop5:Verb
+                Id="RunOnceHereDir"
+                Clsid="D4E5F601-A2B3-4C5D-8E9F-0A1B2C3D4E5F" />
+            </desktop5:ItemType>
           </desktop4:FileExplorerContextMenus>
         </desktop4:Extension>
 

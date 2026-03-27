@@ -4,7 +4,7 @@
  *
  * @author: WaterRun
  * @file: Static/Text.cs
- * @date: 2026-03-26
+ * @date: 2026-03-27
  */
 
 #nullable enable
@@ -214,11 +214,11 @@ public static class Text
         
         // LLM 设置组
         ["大模型"] = "LLM",
-        ["验证连接"] = "Verify Connection",
-        ["正在验证..."] = "Verifying...",
-        ["已验证"] = "Verified",
-        ["验证失败: {0}"] = "Verification failed: {0}",
-        ["未验证"] = "Not verified",
+        ["生成可用检测"] = "Test Generation",
+        ["正在检测..."] = "Testing...",
+        ["检测通过"] = "Test passed",
+        ["检测失败: {0}"] = "Test failed: {0}",
+        ["未检测"] = "Not tested",
         ["配置语言偏好、附加提示词与校对选项"] = "Configure language preference, additional prompt and verification options",
         ["语言偏好"] = "Language Preference",
         ["附加提示词"] = "Additional Prompt",
@@ -231,10 +231,13 @@ public static class Text
         ["大模型生成的代码可能有误。"] = "AI-generated code may be incorrect.",
         ["将覆盖编辑器中的现有内容，继续吗？"] = "This will overwrite existing content in the editor. Continue?",
         ["覆盖"] = "Overwrite",
-        ["大模型设置未配置。前往设置并验证连接后使用。"] = "LLM settings not configured. Go to Settings and verify connection first.",
+        ["大模型基础信息未配置。前往设置并配置后使用。"] = "LLM basic settings not configured. Please go to Settings and configure before use.",
         ["前往设置"] = "Go to Settings",
-        ["校对未通过，代码已加载但未自动执行。"] = "Double check did not pass. Code loaded but not auto-executed.",
+        ["未通过校验"] = "Verification failed",
         ["生成后二次校对"] = "Double Check After Generation",
+        ["脚本放置行为"] = "Script Placement",
+        ["你是一个代码审查助手。用户的需求是："] = "You are a code review assistant. The user's requirement is: ",
+        ["。请检查以下代码是否正确实现了该需求。如果代码正确，仅回复 PASS。如果代码有误，直接给出修正后的完整代码，不要包含任何解释或 Markdown 标记。"] = ". Please check if the following code correctly implements this requirement. If correct, reply only with PASS. If incorrect, provide the corrected complete code without any explanations or Markdown markers.",
         ["换行"] = "new line",
     };
 

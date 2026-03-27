@@ -4,7 +4,7 @@
  *
  * @author: WaterRun
  * @file: Static/LlmClient.cs
- * @date: 2026-03-26
+ * @date: 2026-03-27
  */
 
 #nullable enable
@@ -55,6 +55,19 @@ public static class LlmClient
     /// 线程/重入：可安全并发调用。
     /// I/O：向 <see cref="Config.LlmBaseUrl"/> 发起一次 HTTP POST 请求，使用与 <see cref="GenerateScriptAsync"/> 相同的请求路径。
     /// </remarks>
+    /// <summary>通过发起一次与实际生成完全一致的请求来检测当前 LLM 配置是否可用。</summary>
+    /// <param name="cancellationToken">取消令牌。</param>
+    /// <returns>检测成功返回 true；API Key 为空时返回 false。</returns>
+    /// <exception cref="InvalidOperationException">当 API 返回错误时抛出，包含具体错误信息。</exception>
+    /// <exception cref="TimeoutException">当请求超时时抛出。</exception>
+    /// <exception cref="HttpRequestException">当网络传输失败时抛出。</exception>
+    /// <exception cref="OperationCanceledException">当 <paramref name="cancellationToken"/> 被触发时抛出。</exception>
+    /// <remarks>
+    /// 取消语义：支持通过 <paramref name="cancellationToken"/> 取消。
+    /// 线程/重入：可安全并发调用。
+    /// I/O：向 <see cref="Config.LlmBaseUrl"/> 发起一次 HTTP POST 请求，
+    /// 使用与 <see cref="GenerateScriptAsync"/> 相同的系统提示词、max_tokens 与超时参数，确保"能跑通验证即能跑通生成"。
+    /// </remarks>
     public static async Task<bool> VerifyConnectionAsync(CancellationToken cancellationToken = default)
     {
         string apiKey = Config.LlmApiKey;
@@ -66,10 +79,13 @@ public static class LlmClient
 
         try
         {
+            string language = Config.LlmLanguagePreference;
+            string systemContent = BuildSystemPrompt(language);
+
             await SendChatRequestAsync(
-                    "Reply with the single word OK.",
-                    "hi",
-                    1024,
+                    systemContent,
+                    "Generate a script that prints hello world.",
+                    Config.LlmMaxTokens,
                     Config.LlmTimeoutSeconds,
                     cancellationToken)
                 .ConfigureAwait(false);

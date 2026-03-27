@@ -4,7 +4,7 @@
  * 
  * @author: WaterRun
  * @file: App.xaml.cs
- * @date: 2026-03-26
+ * @date: 2026-03-27
  */
 
 #nullable enable
@@ -43,31 +43,6 @@ public partial class App : Application
     public string LaunchArguments { get; private set; } = string.Empty;
 
     /// <summary>
-    /// 获取应用程序是否以 LLM 生成模式启动。
-    /// </summary>
-    /// <value>当启动参数中包含 <c>--llm</c> 标志时为 true。</value>
-    public bool IsLlmMode { get; private set; }
-
-    /// <summary>
-    /// 尝试消费一次 LLM 启动模式标志，避免重复触发自动生成功能。
-    /// </summary>
-    /// <returns>当本次调用成功消费标志并将其重置为 false 时返回 true；否则返回 false。</returns>
-    /// <remarks>
-    /// 线程安全：该方法设计为在 UI 线程调用。
-    /// 副作用：当返回 true 时会将 <see cref="IsLlmMode"/> 从 true 改写为 false。
-    /// </remarks>
-    public bool TryConsumeLlmMode()
-    {
-        if (!IsLlmMode)
-        {
-            return false;
-        }
-
-        IsLlmMode = false;
-        return true;
-    }
-
-    /// <summary>
     /// 初始化应用程序实例。
     /// </summary>
     public App()
@@ -82,27 +57,16 @@ public partial class App : Application
     /// <remarks>
     /// 执行顺序：解析启动参数 → 创建主窗口 → 应用主题 → 激活窗口。
     /// </remarks>
+    /// <summary>
+    /// 应用程序启动时的入口点。
+    /// </summary>
+    /// <param name="args">启动参数，包含激活类型与激活数据。</param>
+    /// <remarks>
+    /// 执行顺序：解析启动参数 → 创建主窗口 → 应用主题 → 激活窗口。
+    /// </remarks>
     protected override void OnLaunched(LaunchActivatedEventArgs args)
     {
-        string rawArgs = args.Arguments ?? string.Empty;
-
-        // 检测并剥离 --llm 标志
-        const string llmFlag = " --llm";
-        if (rawArgs.EndsWith(llmFlag, StringComparison.OrdinalIgnoreCase))
-        {
-            IsLlmMode = true;
-            LaunchArguments = rawArgs[..^llmFlag.Length].Trim();
-        }
-        else if (rawArgs.Equals("--llm", StringComparison.OrdinalIgnoreCase))
-        {
-            IsLlmMode = true;
-            LaunchArguments = string.Empty;
-        }
-        else
-        {
-            IsLlmMode = false;
-            LaunchArguments = rawArgs;
-        }
+        LaunchArguments = args.Arguments ?? string.Empty;
 
         _mainWindow = new MainWindow();
         ApplyTheme(Config.Theme);

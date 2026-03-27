@@ -4,7 +4,7 @@
  *
  * @author: WaterRun
  * @file: View/Settings.xaml.cs
- * @date: 2026-03-26
+ * @date: 2026-03-27
  */
 
 #nullable enable
@@ -268,18 +268,18 @@ public sealed partial class Settings : Page
         LlmApiKeyLabel.Text = Text.Localize("API Key");
         LlmBaseUrlLabel.Text = Text.Localize("API 基础 URL");
         LlmModelLabel.Text = Text.Localize("模型名称");
-        LlmVerifyButton.Content = Text.Localize("验证连接");
+        LlmVerifyButton.Content = Text.Localize("生成可用检测");
 
         if (LlmClient.IsConnectionVerified)
         {
             SetLlmVerifyStatus(
-                Text.Localize("已验证"),
+                Text.Localize("检测通过"),
                 new SolidColorBrush(Color.FromArgb(255, 16, 124, 16)));
         }
         else
         {
             LlmVerifyStatus.Foreground = (Brush)Application.Current.Resources["TextFillColorSecondaryBrush"];
-            LlmVerifyStatus.Text = Text.Localize("未验证");
+            LlmVerifyStatus.Text = Text.Localize("未检测");
         }
 
         LlmAdvancedLabel.Text = Text.Localize("高级设置");
@@ -667,7 +667,7 @@ public sealed partial class Settings : Page
         Config.LlmApiKey = LlmApiKeyBox.Password;
         LlmClient.ResetVerificationState();
         LlmVerifyStatus.Foreground = (Brush)Application.Current.Resources["TextFillColorSecondaryBrush"];
-        LlmVerifyStatus.Text = Text.Localize("未验证");
+        LlmVerifyStatus.Text = Text.Localize("未检测");
     }
 
     /// <summary>
@@ -682,7 +682,7 @@ public sealed partial class Settings : Page
             : LlmBaseUrlBox.Text;
         LlmClient.ResetVerificationState();
         LlmVerifyStatus.Foreground = (Brush)Application.Current.Resources["TextFillColorSecondaryBrush"];
-        LlmVerifyStatus.Text = Text.Localize("未验证");
+        LlmVerifyStatus.Text = Text.Localize("未检测");
     }
 
     /// <summary>
@@ -697,7 +697,7 @@ public sealed partial class Settings : Page
             : LlmModelBox.Text;
         LlmClient.ResetVerificationState();
         LlmVerifyStatus.Foreground = (Brush)Application.Current.Resources["TextFillColorSecondaryBrush"];
-        LlmVerifyStatus.Text = Text.Localize("未验证");
+        LlmVerifyStatus.Text = Text.Localize("未检测");
     }
 
     /// <summary>
@@ -721,7 +721,7 @@ public sealed partial class Settings : Page
 
         LlmVerifyButton.IsEnabled = false;
         LlmVerifyStatus.Foreground = (Brush)Application.Current.Resources["TextFillColorSecondaryBrush"];
-        LlmVerifyStatus.Text = Text.Localize("正在验证...");
+        LlmVerifyStatus.Text = Text.Localize("正在检测...");
 
         try
         {
@@ -729,19 +729,19 @@ public sealed partial class Settings : Page
             if (ok)
             {
                 SetLlmVerifyStatus(
-                    Text.Localize("已验证"),
+                    Text.Localize("检测通过"),
                     new SolidColorBrush(Color.FromArgb(255, 16, 124, 16)));
             }
             else
             {
                 LlmVerifyStatus.Foreground = (Brush)Application.Current.Resources["TextFillColorSecondaryBrush"];
-                LlmVerifyStatus.Text = Text.Localize("未验证");
+                LlmVerifyStatus.Text = Text.Localize("未检测");
             }
         }
         catch (Exception ex)
         {
             SetLlmVerifyStatus(
-                Text.Localize("验证失败: {0}", ex.Message),
+                Text.Localize("检测失败: {0}", ex.Message),
                 new SolidColorBrush(Color.FromArgb(255, 196, 43, 28)));
         }
         finally

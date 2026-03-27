@@ -4,7 +4,7 @@
  *
  * @author: WaterRun
  * @file: View/Editor.xaml.cs
- * @date: 2026-03-26
+ * @date: 2026-03-27
  */
 
 #nullable enable
@@ -151,11 +151,6 @@ public sealed partial class Editor : Page
         UpdatePlaceholderText();
         UpdatePlaceholderVisibility();
         CodeEditor.Focus(FocusState.Programmatic);
-
-        if (Application.Current is App app && app.TryConsumeLlmMode())
-        {
-            _ = HandleLlmGenerateAsync();
-        }
     }
 
     /// <summary>
@@ -1060,7 +1055,7 @@ public sealed partial class Editor : Page
     #region LLM 生成代码
 
     /// <summary>
-    /// 处理 LLM 代码生成完整流程：API Key 校验 → 覆盖确认 → 生成对话框 → 可选二次校对 → 加载编辑器 → 可选自动执行。
+    /// 处理 LLM 代码生成完整流程：基础信息校验 → 覆盖确认 → 生成对话框（含可选自动二次校对）→ 加载编辑器 → 可选自动执行。
     /// </summary>
     /// <returns>表示异步生成流程的任务。</returns>
     /// <remarks>
@@ -1078,9 +1073,23 @@ public sealed partial class Editor : Page
 
         try
         {
-            if (string.IsNullOrEmpty(Config.LlmApiKey))
+            if (string.IsNullOrWhiteSpace(Config.LlmApiKey))
             {
-                await OfferNavigateToLlmSettingsAsync();
+                ContentDialog unconfiguredDialog = new()
+                {
+                    Title = Text.Localize("大模型生成代码"),
+                    Content = Text.Localize("大模型基础信息未配置。前往设置并配置后使用。"),
+                    PrimaryButtonText = Text.Localize("前往设置"),
+                    CloseButtonText = Text.Localize("取消"),
+                    DefaultButton = ContentDialogButton.Primary,
+                    XamlRoot = XamlRoot,
+                };
+
+                if (await unconfiguredDialog.ShowAsync() is ContentDialogResult.Primary)
+                {
+                    NavigateToSettings(scrollToLlm: true);
+                }
+
                 return;
             }
 
@@ -1109,15 +1118,6 @@ public sealed partial class Editor : Page
                 return;
             }
 
-            if (Config.LlmDoubleCheck)
-            {
-                code = await ShowLlmReviewDialogAsync(code);
-                if (string.IsNullOrEmpty(code))
-                {
-                    return;
-                }
-            }
-
             LoadCodeIntoEditor(code);
 
             if (Config.LlmAutoExecute)
@@ -1128,36 +1128,6 @@ public sealed partial class Editor : Page
         finally
         {
             _isLlmGenerating = false;
-        }
-    }
-
-    /// <summary>
-    /// 当 API Key 未配置时弹出引导对话框，允许用户选择前往设置页面进行配置。
-    /// </summary>
-    /// <returns>表示异步对话框操作的任务。</returns>
-    /// <remarks>
-    /// 完成语义：对话框关闭后任务完成；若用户确认则设置 <see cref="Settings.PendingScrollToLlm"/> 并导航至设置页。
-    /// </remarks>
-    private async Task OfferNavigateToLlmSettingsAsync()
-    {
-        if (XamlRoot is null)
-        {
-            return;
-        }
-
-        ContentDialog dialog = new()
-        {
-            Title = Text.Localize("大模型未配置"),
-            Content = Text.Localize("尚未配置 API Key，是否前往设置页面进行配置？"),
-            PrimaryButtonText = Text.Localize("前往设置"),
-            CloseButtonText = Text.Localize("取消"),
-            DefaultButton = ContentDialogButton.Primary,
-            XamlRoot = XamlRoot,
-        };
-
-        if (await dialog.ShowAsync() is ContentDialogResult.Primary)
-        {
-            NavigateToSettings(scrollToLlm: true);
         }
     }
 
@@ -1234,12 +1204,13 @@ public sealed partial class Editor : Page
             VerticalAlignment = VerticalAlignment.Center,
         };
         progressRow.Children.Add(new ProgressRing { IsActive = true, Width = 20, Height = 20 });
-        progressRow.Children.Add(new TextBlock
+        TextBlock progressText = new()
         {
             Text = Text.Localize("正在生成..."),
             Style = (Style)Application.Current.Resources["CaptionTextBlockStyle"],
             VerticalAlignment = VerticalAlignment.Center,
-        });
+        };
+        progressRow.Children.Add(progressText);
         contentPanel.Children.Add(progressRow);
 
         TextBlock errorText = new()
@@ -1276,9 +1247,9 @@ public sealed partial class Editor : Page
             cts?.Dispose();
             cts = new CancellationTokenSource();
             await RunGenerationAsync(
-                dialog, promptBox, langBox, progressRow, errorText,
-                code => { generatedCode = code; },
-                cts);
+                            dialog, promptBox, langBox, progressRow, progressText, errorText,
+                            code => { generatedCode = code; },
+                            cts);
         };
 
         dialog.CloseButtonClick += (_, _) => cts?.Cancel();
@@ -1299,9 +1270,9 @@ public sealed partial class Editor : Page
                         cts?.Dispose();
                         cts = new CancellationTokenSource();
                         _ = RunGenerationAsync(
-                            dialog, promptBox, langBox, progressRow, errorText,
-                            code => { generatedCode = code; },
-                            cts);
+                                                    dialog, promptBox, langBox, progressRow, progressText, errorText,
+                                                    code => { generatedCode = code; },
+                                                    cts);
                     }
                 }
             }
@@ -1313,71 +1284,6 @@ public sealed partial class Editor : Page
         cts = null;
 
         return generatedCode;
-    }
-
-    /// <summary>
-    /// 显示 LLM 生成结果的二次校对对话框，允许用户审查与编辑代码后决定是否采纳。
-    /// </summary>
-    /// <param name="code">LLM 生成的原始代码文本，非空。</param>
-    /// <returns>用户确认后的代码文本（可能已编辑）；若用户放弃则返回 null。</returns>
-    /// <remarks>
-    /// 完成语义：对话框关闭后返回结果，不修改编辑器状态。
-    /// 设计决策 DECISION-LLM-REVIEW-001：代码框可编辑，允许用户在采纳前做细微调整。
-    /// </remarks>
-    private async Task<string?> ShowLlmReviewDialogAsync(string code)
-    {
-        if (XamlRoot is null)
-        {
-            return null;
-        }
-
-        StackPanel panel = new() { Spacing = 12, MinWidth = 500 };
-
-        panel.Children.Add(new TextBlock
-        {
-            Text = Text.Localize("请检查生成的代码是否符合预期："),
-            TextWrapping = TextWrapping.Wrap,
-            Style = (Style)Application.Current.Resources["CaptionTextBlockStyle"],
-            Foreground = (Brush)Application.Current.Resources["TextFillColorSecondaryBrush"],
-        });
-
-        TextBox codeBox = new()
-        {
-            Text = code,
-            AcceptsReturn = true,
-            TextWrapping = TextWrapping.NoWrap,
-            FontFamily = new FontFamily("Cascadia Code, Cascadia Mono, Consolas, Courier New, monospace"),
-            FontSize = 13,
-            IsReadOnly = false,
-            MinHeight = 150,
-        };
-        panel.Children.Add(codeBox);
-
-        ScrollViewer scrollViewer = new()
-        {
-            Content = panel,
-            VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
-            HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
-            MaxHeight = Math.Max(250, XamlRoot.Size.Height - 200),
-        };
-
-        ContentDialog dialog = new()
-        {
-            Title = Text.Localize("代码审查"),
-            Content = scrollViewer,
-            PrimaryButtonText = Text.Localize("使用此代码"),
-            CloseButtonText = Text.Localize("放弃"),
-            DefaultButton = ContentDialogButton.Primary,
-            XamlRoot = XamlRoot,
-        };
-
-        if (await dialog.ShowAsync() is ContentDialogResult.Primary)
-        {
-            string reviewed = codeBox.Text;
-            return string.IsNullOrWhiteSpace(reviewed) ? null : reviewed;
-        }
-
-        return null;
     }
 
     /// <summary>
@@ -1409,12 +1315,13 @@ public sealed partial class Editor : Page
     }
 
     /// <summary>
-    /// 执行 LLM 生成的核心逻辑：调用 <see cref="LlmClient"/>，更新对话框 UI 状态，成功后关闭对话框。
+    /// 执行 LLM 生成的核心逻辑：调用 <see cref="LlmClient"/> 生成代码，可选自动二次校对，更新对话框 UI 状态，成功后关闭对话框。
     /// </summary>
     /// <param name="dialog">承载生成流程的对话框实例。</param>
     /// <param name="promptBox">用户输入需求描述的文本框。</param>
     /// <param name="langBox">语言选择下拉框。</param>
     /// <param name="progressRow">进度指示面板。</param>
+    /// <param name="progressText">进度指示文本块，用于切换"正在生成..."与"正在校对..."。</param>
     /// <param name="errorText">错误提示文本块。</param>
     /// <param name="onSuccess">生成成功时的回调，接收生成的代码文本。</param>
     /// <param name="cts">取消令牌源，允许为 null；调用方负责释放。</param>
@@ -1423,13 +1330,16 @@ public sealed partial class Editor : Page
     /// 调用方负责 <paramref name="cts"/> 的释放，本方法不释放。
     /// 取消语义：通过 <paramref name="cts"/> 取消时静默处理，不关闭对话框。
     /// 完成语义：成功时调用 <paramref name="onSuccess"/> 并关闭对话框；失败时显示错误信息并恢复输入状态。
-    /// 涉及 I/O：通过 <see cref="LlmClient.GenerateScriptAsync"/> 发起网络请求。
+    /// 当 <see cref="Config.LlmDoubleCheck"/> 启用时，生成完成后自动调用 <see cref="LlmClient.DoubleCheckAsync"/>；
+    /// 校对未通过视为失败，显示错误信息，不输出代码。
+    /// 涉及 I/O：通过 <see cref="LlmClient.GenerateScriptAsync"/> 与 <see cref="LlmClient.DoubleCheckAsync"/> 发起网络请求。
     /// </remarks>
     private static async Task RunGenerationAsync(
         ContentDialog dialog,
         TextBox promptBox,
         ComboBox langBox,
         StackPanel progressRow,
+        TextBlock progressText,
         TextBlock errorText,
         Action<string> onSuccess,
         CancellationTokenSource? cts = null)
@@ -1438,6 +1348,7 @@ public sealed partial class Editor : Page
         promptBox.IsEnabled = false;
         langBox.IsEnabled = false;
         progressRow.Visibility = Visibility.Visible;
+        progressText.Text = Text.Localize("正在生成...");
         errorText.Visibility = Visibility.Collapsed;
 
         string? preferredLanguage = langBox.SelectedIndex >= 0 && langBox.SelectedIndex < Config.SupportedLanguages.Count
@@ -1448,6 +1359,24 @@ public sealed partial class Editor : Page
         {
             CancellationToken token = cts?.Token ?? CancellationToken.None;
             string code = await LlmClient.GenerateScriptAsync(promptBox.Text.Trim(), preferredLanguage, token);
+
+            if (Config.LlmDoubleCheck)
+            {
+                progressText.Text = Text.Localize("正在校对...");
+                (_, bool passed) = await LlmClient.DoubleCheckAsync(promptBox.Text.Trim(), code, token);
+
+                if (!passed)
+                {
+                    progressRow.Visibility = Visibility.Collapsed;
+                    errorText.Text = Text.Localize("未通过校验");
+                    errorText.Visibility = Visibility.Visible;
+                    dialog.IsPrimaryButtonEnabled = true;
+                    promptBox.IsEnabled = true;
+                    langBox.IsEnabled = true;
+                    return;
+                }
+            }
+
             onSuccess(code);
             dialog.Hide();
         }
