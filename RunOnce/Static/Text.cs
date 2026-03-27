@@ -103,6 +103,7 @@ public static class Text
         ["快捷键"] = "Keyboard Shortcuts",
         ["查看应用程序支持的快捷键"] = "View supported keyboard shortcuts",
         ["查看"] = "View",
+        ["查看快捷键"] = "View Shortcuts",
         ["关闭"] = "Close",
         ["执行代码"] = "Execute Code",
         ["撤销"] = "Undo",
@@ -211,7 +212,7 @@ public static class Text
             "You are a professional script generation assistant. Generate executable script code in {0} based on the user's requirements. Output only the script code itself, without any explanations, comments, or Markdown code block markers.",
         ["你是一个专业的脚本生成助手。根据用户的需求生成可执行的脚本代码。仅输出脚本代码本身，不要包含任何解释、注释说明或 Markdown 代码块标记。支持的语言：bat、powershell、python、lua、nim、go。根据需求自动选择最合适的语言。"] =
             "You are a professional script generation assistant. Generate executable script code based on the user's requirements. Output only the script code itself, without any explanations, comments, or Markdown code block markers. Supported languages: bat, powershell, python, lua, nim, go. Automatically choose the most appropriate language.",
-        
+
         // LLM 设置组
         ["大模型"] = "LLM",
         ["生成可用检测"] = "Test Generation",

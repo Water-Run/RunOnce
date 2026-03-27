@@ -247,9 +247,6 @@ public sealed partial class Settings : Page
         ShellDescription.Text = Text.Localize("选择执行代码使用的命令解释器");
         ScriptPlacementLabel.Text = Text.Localize("脚本放置行为");
         ScriptPlacementDescription.Text = Text.Localize("选择临时代码文件的放置位置");
-        ShortcutsLabel.Text = Text.Localize("快捷键");
-        ShortcutsDescription.Text = Text.Localize("查看应用程序支持的快捷键");
-        ShortcutsButton.Content = Text.Localize("查看");
         AdvancedSettingsLabel.Text = Text.Localize("高级设置");
         AdvancedSettingsDescription.Text = Text.Localize("配置临时文件、置信度阈值和语言命令");
         AdvancedSettingsButton.Content = Text.Localize("打开");
@@ -300,6 +297,7 @@ public sealed partial class Settings : Page
     private void ApplyWideLocalizedTexts()
     {
         WideStoreLink.Content = Text.Localize("微软商店");
+        WideShortcutsLink.Content = Text.Localize("查看快捷键");
         WideResetLink.Content = Text.Localize("重置所有设置");
         WideBuildTimeText.Text = $"{Text.Localize("编译于")} {ViewModel.BuildTimeText}";
     }
@@ -317,6 +315,8 @@ public sealed partial class Settings : Page
         NarrowGitHubLink.Content = Text.Localize("访问");
         NarrowStoreLabel.Text = Text.Localize("微软商店");
         NarrowStoreLink.Content = Text.Localize("访问");
+        NarrowShortcutsLabel.Text = Text.Localize("快捷键");
+        NarrowShortcutsLink.Content = Text.Localize("查看");
         NarrowResetLink.Content = Text.Localize("重置所有设置");
     }
 
@@ -340,8 +340,9 @@ public sealed partial class Settings : Page
 
     /// <summary>
     /// 处理"查看快捷键"按钮点击事件，构建并异步显示快捷键列表对话框。
+    /// 宽屏左侧面板的 <see cref="WideShortcutsLink"/> 与窄屏关于区域的 <see cref="NarrowShortcutsLink"/> 均绑定到此处理器。
     /// </summary>
-    /// <param name="sender">事件发送方，通常为触发点击的按钮控件，非空。</param>
+    /// <param name="sender">事件发送方，通常为触发点击的超链接按钮控件，非空。</param>
     /// <param name="e">路由事件参数，非空。</param>
     /// <remarks>
     /// 取消语义：无 <see cref="System.Threading.CancellationToken"/>，对话框关闭即完成，不可取消。

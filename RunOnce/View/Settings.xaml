@@ -52,7 +52,11 @@
                 <TextBlock x:Name="WideBuildTimeText" Style="{ThemeResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" HorizontalAlignment="Center"/>
                 <HyperlinkButton x:Name="WideStoreLink" Padding="0" HorizontalAlignment="Center" Click="StoreLink_Click"/>
             </StackPanel>
-            <HyperlinkButton x:Name="WideResetLink" Grid.Row="1" Padding="0" HorizontalAlignment="Center" Click="ResetAllLink_Click"/>
+            <!-- 查看快捷键在重置之上 -->
+            <StackPanel Grid.Row="1" Spacing="8" HorizontalAlignment="Center">
+                <HyperlinkButton x:Name="WideShortcutsLink" Padding="0" HorizontalAlignment="Center" Click="ShortcutsButton_Click"/>
+                <HyperlinkButton x:Name="WideResetLink" Padding="0" HorizontalAlignment="Center" Click="ResetAllLink_Click"/>
+            </StackPanel>
         </Grid>
 
         <!-- 右侧设置内容区域 -->
@@ -182,19 +186,6 @@
                         <TextBlock x:Name="ScriptPlacementDescription" Style="{ThemeResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
                     </StackPanel>
                     <ComboBox Grid.Column="1" MinWidth="180" VerticalAlignment="Center" ItemsSource="{x:Bind ViewModel.ScriptPlacementOptions}" SelectedIndex="{x:Bind ViewModel.SelectedScriptPlacementIndex, Mode=TwoWay}"/>
-                </Grid>
-
-                <!-- 快捷键 -->
-                <Grid Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1,0,1,1" CornerRadius="0" Padding="16,12,16,12" MinHeight="52">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*"/>
-                        <ColumnDefinition Width="Auto"/>
-                    </Grid.ColumnDefinitions>
-                    <StackPanel Grid.Column="0" VerticalAlignment="Center">
-                        <TextBlock x:Name="ShortcutsLabel" Style="{ThemeResource BodyTextBlockStyle}"/>
-                        <TextBlock x:Name="ShortcutsDescription" Style="{ThemeResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
-                    </StackPanel>
-                    <Button x:Name="ShortcutsButton" Grid.Column="1" VerticalAlignment="Center" Click="ShortcutsButton_Click"/>
                 </Grid>
 
                 <!-- 高级设置 -->
@@ -333,6 +324,16 @@
                         </Grid.ColumnDefinitions>
                         <TextBlock x:Name="NarrowStoreLabel" Grid.Column="0" Style="{ThemeResource BodyTextBlockStyle}" VerticalAlignment="Center"/>
                         <HyperlinkButton x:Name="NarrowStoreLink" Grid.Column="1" Padding="0" VerticalAlignment="Center" Click="StoreLink_Click"/>
+                    </Grid>
+
+                    <!-- 快捷键（归属"此程序"组） -->
+                    <Grid Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1,0,1,1" CornerRadius="0" Padding="16,12,16,12" MinHeight="48">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock x:Name="NarrowShortcutsLabel" Grid.Column="0" Style="{ThemeResource BodyTextBlockStyle}" VerticalAlignment="Center"/>
+                        <HyperlinkButton x:Name="NarrowShortcutsLink" Grid.Column="1" Padding="0" VerticalAlignment="Center" Click="ShortcutsButton_Click"/>
                     </Grid>
 
                     <Grid Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1,0,1,1" CornerRadius="0,0,4,4" Padding="16,12,16,12" MinHeight="44">
