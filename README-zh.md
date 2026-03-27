@@ -1,6 +1,6 @@
 # 一次运行
 
-*[English](./README-en.md)*  
+*[English](./README.md)*  
 
 ![示例图片](./RunOnce/Assets/demo_gif.gif)  
 
