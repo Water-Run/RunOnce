@@ -4,7 +4,7 @@
  *
  * @author: WaterRun
  * @file: View/Editor.xaml.cs
- * @date: 2026-03-27
+ * @date: 2026-03-28
  */
 
 #nullable enable
@@ -1213,6 +1213,46 @@ public sealed partial class Editor : Page
         progressRow.Children.Add(progressText);
         contentPanel.Children.Add(progressRow);
 
+        Grid timeoutRow = new()
+        {
+            Visibility = Visibility.Collapsed,
+            Margin = new Thickness(0, -4, 0, 0),
+        };
+        timeoutRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        timeoutRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+
+        ProgressBar timeoutBar = new()
+        {
+            Minimum = 0,
+            Maximum = 100,
+            Value = 100,
+            Height = 3,
+            VerticalAlignment = VerticalAlignment.Center,
+        };
+        Grid.SetColumn(timeoutBar, 0);
+        timeoutRow.Children.Add(timeoutBar);
+
+        Button resetTimeoutButton = new()
+        {
+            Content = new FontIcon
+            {
+                FontFamily = new FontFamily("Segoe MDL2 Assets"),
+                Glyph = "\xE72C",
+                FontSize = 11,
+            },
+            Style = (Style)Application.Current.Resources["SubtleButtonStyle"],
+            Width = 28,
+            Height = 28,
+            Padding = new Thickness(0),
+            Margin = new Thickness(4, 0, 0, 0),
+            VerticalAlignment = VerticalAlignment.Center,
+        };
+        ToolTipService.SetToolTip(resetTimeoutButton, Text.Localize("重置超时时间"));
+        Grid.SetColumn(resetTimeoutButton, 1);
+        timeoutRow.Children.Add(resetTimeoutButton);
+
+        contentPanel.Children.Add(timeoutRow);
+
         TextBlock errorText = new()
         {
             Foreground = new SolidColorBrush(Color.FromArgb(255, 196, 43, 28)),
@@ -1232,7 +1272,7 @@ public sealed partial class Editor : Page
         };
 
         string? generatedCode = null;
-        CancellationTokenSource? cts = null;
+        CancellationTokenSource dialogCts = new();
 
         dialog.PrimaryButtonClick += async (_, args) =>
         {
@@ -1244,15 +1284,14 @@ public sealed partial class Editor : Page
             }
 
             args.Cancel = true;
-            cts?.Dispose();
-            cts = new CancellationTokenSource();
             await RunGenerationAsync(
-                            dialog, promptBox, langBox, progressRow, progressText, errorText,
-                            code => { generatedCode = code; },
-                            cts);
+                dialog, promptBox, langBox, progressRow, progressText, errorText,
+                timeoutRow, timeoutBar, resetTimeoutButton,
+                code => { generatedCode = code; },
+                dialogCts.Token);
         };
 
-        dialog.CloseButtonClick += (_, _) => cts?.Cancel();
+        dialog.CloseButtonClick += (_, _) => dialogCts.Cancel();
 
         promptBox.PreviewKeyDown += (_, keyArgs) =>
         {
@@ -1267,12 +1306,11 @@ public sealed partial class Editor : Page
                     string prompt = promptBox.Text.Trim();
                     if (!string.IsNullOrWhiteSpace(prompt) && dialog.IsPrimaryButtonEnabled)
                     {
-                        cts?.Dispose();
-                        cts = new CancellationTokenSource();
                         _ = RunGenerationAsync(
-                                                    dialog, promptBox, langBox, progressRow, progressText, errorText,
-                                                    code => { generatedCode = code; },
-                                                    cts);
+                            dialog, promptBox, langBox, progressRow, progressText, errorText,
+                            timeoutRow, timeoutBar, resetTimeoutButton,
+                            code => { generatedCode = code; },
+                            dialogCts.Token);
                     }
                 }
             }
@@ -1280,8 +1318,7 @@ public sealed partial class Editor : Page
 
         await dialog.ShowAsync();
 
-        cts?.Dispose();
-        cts = null;
+        dialogCts.Dispose();
 
         return generatedCode;
     }
@@ -1315,7 +1352,8 @@ public sealed partial class Editor : Page
     }
 
     /// <summary>
-    /// 执行 LLM 生成的核心逻辑：调用 <see cref="LlmClient"/> 生成代码，可选自动二次校对，更新对话框 UI 状态，成功后关闭对话框。
+    /// 执行 LLM 生成的核心逻辑：调用 <see cref="LlmClient"/> 生成代码，可选自动二次校对，
+    /// 管理超时倒计时进度条与重置超时功能，成功后关闭对话框。
     /// </summary>
     /// <param name="dialog">承载生成流程的对话框实例。</param>
     /// <param name="promptBox">用户输入需求描述的文本框。</param>
@@ -1323,12 +1361,15 @@ public sealed partial class Editor : Page
     /// <param name="progressRow">进度指示面板。</param>
     /// <param name="progressText">进度指示文本块，用于切换"正在生成..."与"正在校对..."。</param>
     /// <param name="errorText">错误提示文本块。</param>
+    /// <param name="timeoutRow">超时倒计时进度条所在的容器行。</param>
+    /// <param name="timeoutBar">超时倒计时进度条。</param>
+    /// <param name="resetTimeoutButton">重置超时时间的按钮。</param>
     /// <param name="onSuccess">生成成功时的回调，接收生成的代码文本。</param>
-    /// <param name="cts">取消令牌源，允许为 null；调用方负责释放。</param>
+    /// <param name="dialogCancellation">对话框级别的取消令牌，对话框关闭时触发。</param>
     /// <returns>表示异步生成操作的任务。</returns>
     /// <remarks>
-    /// 调用方负责 <paramref name="cts"/> 的释放，本方法不释放。
-    /// 取消语义：通过 <paramref name="cts"/> 取消时静默处理，不关闭对话框。
+    /// 取消语义：通过 <paramref name="dialogCancellation"/> 取消时静默处理，不关闭对话框；
+    /// 通过重置超时按钮取消时自动重试。
     /// 完成语义：成功时调用 <paramref name="onSuccess"/> 并关闭对话框；失败时显示错误信息并恢复输入状态。
     /// 当 <see cref="Config.LlmDoubleCheck"/> 启用时，生成完成后自动调用 <see cref="LlmClient.DoubleCheckAsync"/>；
     /// 校对未通过视为失败，显示错误信息，不输出代码。
@@ -1341,8 +1382,11 @@ public sealed partial class Editor : Page
         StackPanel progressRow,
         TextBlock progressText,
         TextBlock errorText,
+        Grid timeoutRow,
+        ProgressBar timeoutBar,
+        Button resetTimeoutButton,
         Action<string> onSuccess,
-        CancellationTokenSource? cts = null)
+        CancellationToken dialogCancellation)
     {
         dialog.IsPrimaryButtonEnabled = false;
         promptBox.IsEnabled = false;
@@ -1350,25 +1394,113 @@ public sealed partial class Editor : Page
         progressRow.Visibility = Visibility.Visible;
         progressText.Text = Text.Localize("正在生成...");
         errorText.Visibility = Visibility.Collapsed;
+        timeoutRow.Visibility = Visibility.Visible;
 
         string? preferredLanguage = langBox.SelectedIndex >= 0 && langBox.SelectedIndex < Config.SupportedLanguages.Count
             ? Config.SupportedLanguages[langBox.SelectedIndex]
             : Config.LlmLanguagePreference;
 
+        int totalTicks = Config.LlmTimeoutSeconds * 10;
+        int currentTick = totalTicks;
+        bool resetRequested = false;
+        CancellationTokenSource? internalCts = null;
+
+        DispatcherQueueTimer? countdown = Microsoft.UI.Dispatching.DispatcherQueue.GetForCurrentThread()?.CreateTimer();
+        if (countdown is not null)
+        {
+            countdown.Interval = TimeSpan.FromMilliseconds(100);
+            countdown.IsRepeating = true;
+            countdown.Tick += (_, _) =>
+            {
+                currentTick--;
+                timeoutBar.Value = totalTicks > 0
+                    ? Math.Max(0, (double)currentTick / totalTicks * 100)
+                    : 0;
+                if (currentTick <= 0)
+                {
+                    countdown.Stop();
+                }
+            };
+        }
+
+        void OnResetClick(object sender, RoutedEventArgs e)
+        {
+            resetRequested = true;
+            internalCts?.Cancel();
+        }
+
+        resetTimeoutButton.Click += OnResetClick;
+
         try
         {
-            CancellationToken token = cts?.Token ?? CancellationToken.None;
-            string code = await LlmClient.GenerateScriptAsync(promptBox.Text.Trim(), preferredLanguage, token);
-
-            if (Config.LlmDoubleCheck)
+            while (true)
             {
-                progressText.Text = Text.Localize("正在校对...");
-                (_, bool passed) = await LlmClient.DoubleCheckAsync(promptBox.Text.Trim(), code, token);
+                resetRequested = false;
+                internalCts?.Dispose();
+                internalCts = CancellationTokenSource.CreateLinkedTokenSource(dialogCancellation);
 
-                if (!passed)
+                totalTicks = Config.LlmTimeoutSeconds * 10;
+                currentTick = totalTicks;
+                timeoutBar.Value = 100;
+                progressText.Text = Text.Localize("正在生成...");
+                countdown?.Start();
+
+                try
                 {
+                    CancellationToken token = internalCts.Token;
+                    string code = await LlmClient.GenerateScriptAsync(
+                        promptBox.Text.Trim(), preferredLanguage, token);
+
+                    countdown?.Stop();
+
+                    if (Config.LlmDoubleCheck)
+                    {
+                        progressText.Text = Text.Localize("正在校对...");
+                        totalTicks = Config.LlmTimeoutSeconds * 2 * 10;
+                        currentTick = totalTicks;
+                        timeoutBar.Value = 100;
+                        countdown?.Start();
+
+                        (string checkedCode, bool passed) = await LlmClient.DoubleCheckAsync(
+                            promptBox.Text.Trim(), code, token);
+
+                        countdown?.Stop();
+
+                        if (!passed)
+                        {
+                            timeoutRow.Visibility = Visibility.Collapsed;
+                            progressRow.Visibility = Visibility.Collapsed;
+                            errorText.Text = Text.Localize("未通过校验");
+                            errorText.Visibility = Visibility.Visible;
+                            dialog.IsPrimaryButtonEnabled = true;
+                            promptBox.IsEnabled = true;
+                            langBox.IsEnabled = true;
+                            return;
+                        }
+                    }
+
+                    timeoutRow.Visibility = Visibility.Collapsed;
+                    onSuccess(code);
+                    dialog.Hide();
+                    return;
+                }
+                catch (OperationCanceledException) when (resetRequested && !dialogCancellation.IsCancellationRequested)
+                {
+                    countdown?.Stop();
+                    continue;
+                }
+                catch (OperationCanceledException)
+                {
+                    countdown?.Stop();
+                    timeoutRow.Visibility = Visibility.Collapsed;
+                    return;
+                }
+                catch (Exception ex)
+                {
+                    countdown?.Stop();
+                    timeoutRow.Visibility = Visibility.Collapsed;
                     progressRow.Visibility = Visibility.Collapsed;
-                    errorText.Text = Text.Localize("未通过校验");
+                    errorText.Text = ex.Message;
                     errorText.Visibility = Visibility.Visible;
                     dialog.IsPrimaryButtonEnabled = true;
                     promptBox.IsEnabled = true;
@@ -1376,22 +1508,12 @@ public sealed partial class Editor : Page
                     return;
                 }
             }
-
-            onSuccess(code);
-            dialog.Hide();
         }
-        catch (OperationCanceledException)
+        finally
         {
-            // CANCEL-001: 用户主动取消 LLM 生成请求，无需处理
-        }
-        catch (Exception ex)
-        {
-            progressRow.Visibility = Visibility.Collapsed;
-            errorText.Text = ex.Message;
-            errorText.Visibility = Visibility.Visible;
-            dialog.IsPrimaryButtonEnabled = true;
-            promptBox.IsEnabled = true;
-            langBox.IsEnabled = true;
+            resetTimeoutButton.Click -= OnResetClick;
+            countdown?.Stop();
+            internalCts?.Dispose();
         }
     }
 
