@@ -513,22 +513,41 @@ public sealed partial class Editor : Page
     }
 
     /// <summary>
-    /// 处理编辑器指针捕获丢失事件，退出拖动选区保护状态。
+    /// 处理编辑器指针捕获丢失事件。
     /// </summary>
     /// <param name="sender">事件源。</param>
     /// <param name="e">路由事件参数。</param>
+    /// <remarks>
+    /// 反向拖拽选区过程中，RichEditBox 可能短暂触发 PointerCaptureLost。
+    /// 当检测到鼠标左键仍处于按下状态时，不结束拖拽保护，仅标记待补做高亮。
+    /// </remarks>
     private void CodeEditor_PointerCaptureLost(object sender, RoutedEventArgs e)
     {
+        if (IsLeftPointerButtonDown())
+        {
+            _pendingHighlightAfterPointerRelease = true;
+            return;
+        }
+
         EndPointerSelectionAndScheduleHighlight();
     }
 
     /// <summary>
-    /// 处理编辑器失焦事件，退出拖动选区保护状态。
+    /// 处理编辑器失焦事件。
     /// </summary>
     /// <param name="sender">事件源。</param>
     /// <param name="e">路由事件参数。</param>
+    /// <remarks>
+    /// 当左键仍按下时，失焦可能发生在拖拽过程中的临时状态切换，不应提前终止选区流程。
+    /// </remarks>
     private void CodeEditor_LostFocus(object sender, RoutedEventArgs e)
     {
+        if (IsLeftPointerButtonDown())
+        {
+            _pendingHighlightAfterPointerRelease = true;
+            return;
+        }
+
         EndPointerSelectionAndScheduleHighlight();
     }
 
@@ -543,6 +562,12 @@ public sealed partial class Editor : Page
             return;
         }
 
+        if (IsLeftPointerButtonDown())
+        {
+            _pendingHighlightAfterPointerRelease = true;
+            return;
+        }
+
         _isPointerSelecting = false;
 
         if (_pendingHighlightAfterPointerRelease)
@@ -550,12 +575,22 @@ public sealed partial class Editor : Page
             _pendingHighlightAfterPointerRelease = false;
             DispatcherQueue.TryEnqueue(Microsoft.UI.Dispatching.DispatcherQueuePriority.Low, () =>
             {
-                if (!_isPointerSelecting)
+                if (!_isPointerSelecting && !IsLeftPointerButtonDown())
                 {
                     ApplyViewportHighlighting();
                 }
             });
         }
+    }
+
+    /// <summary>
+    /// 判断当前线程输入状态下鼠标左键是否仍处于按下状态。
+    /// </summary>
+    /// <returns>左键按下返回 true，否则返回 false。</returns>
+    private static bool IsLeftPointerButtonDown()
+    {
+        CoreVirtualKeyStates leftState = InputKeyboardSource.GetKeyStateForCurrentThread(VirtualKey.LeftButton);
+        return (leftState & CoreVirtualKeyStates.Down) != 0;
     }
 
     #endregion
@@ -659,6 +694,12 @@ public sealed partial class Editor : Page
             return;
         }
 
+        if (IsLeftPointerButtonDown())
+        {
+            _isPointerSelecting = true;
+            _pendingHighlightAfterPointerRelease = true;
+        }
+
         string text = GetPlainText();
         int position = CodeEditor.Document.Selection.StartPosition;
         ViewModel.UpdateCursorPosition(text, position);
@@ -672,8 +713,9 @@ public sealed partial class Editor : Page
         string text = GetPlainText();
         ViewModel.RunDetection(NormalizeForAnalysis(text));
 
-        if (_isPointerSelecting)
+        if (_isPointerSelecting || IsLeftPointerButtonDown())
         {
+            _isPointerSelecting = true;
             _pendingHighlightAfterPointerRelease = true;
             return;
         }
@@ -874,8 +916,9 @@ public sealed partial class Editor : Page
     /// <param name="text">编辑器原始文本，若为 null 则从编辑器获取。</param>
     private void ApplyViewportHighlighting(string? text = null)
     {
-        if (_isPointerSelecting)
+        if (_isPointerSelecting || IsLeftPointerButtonDown())
         {
+            _isPointerSelecting = true;
             _pendingHighlightAfterPointerRelease = true;
             return;
         }
