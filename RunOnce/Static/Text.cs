@@ -4,7 +4,7 @@
  *
  * @author: WaterRun
  * @file: Static/Text.cs
- * @date: 2026-03-28
+ * @date: 2026-04-09
  */
 
 #nullable enable
@@ -241,6 +241,11 @@ public static class Text
         ["。请检查以下代码是否正确实现了该需求。如果代码正确，仅回复 PASS。如果代码有误，直接给出修正后的完整代码，不要包含任何解释或 Markdown 标记。"] = ". Please check if the following code correctly implements this requirement. If correct, reply only with PASS. If incorrect, provide the corrected complete code without any explanations or Markdown markers.",
         ["换行"] = "new line",
         ["重置超时时间"] = "Reset Timeout",
+
+        // 管理员运行
+        ["管理员运行"] = "Run as Admin",
+        ["启动管理员终端"] = "Launch Admin Terminal",
+        ["管理员运行方式"] = "Admin Run Mode",
     };
 
     /// <summary>

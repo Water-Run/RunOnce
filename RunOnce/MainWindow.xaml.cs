@@ -4,7 +4,7 @@
  *
  * @author: WaterRun
  * @file: MainWindow.xaml.cs
- * @date: 2026-03-26
+ * @date: 2026-04-09
  */
 
 #nullable enable
@@ -20,6 +20,10 @@ using System.IO;
 using System.Runtime.InteropServices;
 using WinRT;
 using WinRT.Interop;
+using Microsoft.UI.Input;
+using Windows.System;
+using Windows.UI.Core;
+using System.Threading.Tasks;
 
 namespace RunOnce;
 
@@ -95,7 +99,7 @@ public sealed partial class MainWindow : Window
 
         Closed += OnWindowClosed;
 
-        Exec.CleanupStaleTempFiles();
+        Task.Run(Exec.CleanupStaleTempFiles);
     }
 
     /// <summary>
@@ -202,7 +206,7 @@ public sealed partial class MainWindow : Window
         AppTitleTextBlock.Text = appName;
         ToolTipService.SetToolTip(ArgsButton, $"{Text.Localize("命令行参数")} (Ctrl+E)");
         ToolTipService.SetToolTip(LlmButton, $"{Text.Localize("大模型生成代码")} (Ctrl+L)");
-        ToolTipService.SetToolTip(RunButton, $"{Text.Localize("运行")} (Ctrl+Enter)");
+        ToolTipService.SetToolTip(RunButton, $"{Text.Localize("运行")} (Ctrl+Enter)\nShift: {Text.Localize("管理员运行")}");
         ToolTipService.SetToolTip(SettingsButton, $"{Text.Localize("设置")} (Ctrl+S)");
     }
 
@@ -315,7 +319,7 @@ public sealed partial class MainWindow : Window
     }
 
     /// <summary>
-    /// 运行按钮点击事件处理程序。
+    /// 运行按钮点击事件处理程序，检测 Shift 键以支持管理员运行。
     /// </summary>
     /// <param name="sender">事件源对象。</param>
     /// <param name="e">路由事件参数。</param>
@@ -323,7 +327,9 @@ public sealed partial class MainWindow : Window
     {
         if (ContentFrame.Content is Editor editorPage)
         {
-            editorPage.HandleExecuteRequest();
+            CoreVirtualKeyStates shiftState = InputKeyboardSource.GetKeyStateForCurrentThread(VirtualKey.Shift);
+            bool isShift = (shiftState & CoreVirtualKeyStates.Down) != 0;
+            editorPage.HandleExecuteRequest(isShift);
         }
     }
 

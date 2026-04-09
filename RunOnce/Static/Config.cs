@@ -4,7 +4,7 @@
  *
  * @author: WaterRun
  * @file: Static/Config.cs
- * @date: 2026-03-26
+ * @date: 2026-04-09
  */
 
 #nullable enable
@@ -109,6 +109,18 @@ public enum ScriptPlacementBehavior
 }
 
 /// <summary>
+/// 管理员运行方式枚举，定义以管理员身份执行脚本时的提权策略。
+/// </summary>
+public enum AdminRunMode
+{
+    /// <summary>在指令前加 sudo（适用于 Windows 11 24H2+）。</summary>
+    WindowsSudo,
+
+    /// <summary>以管理员身份启动终端窗口（UAC 提示）。</summary>
+    ElevatedTerminal,
+}
+
+/// <summary>
 /// 应用程序配置静态类，提供所有用户设置项的读写与持久化，以及硬编码常量的访问。
 /// </summary>
 /// <remarks>
@@ -156,7 +168,7 @@ public static class Config
 
     /// <summary>软件的当前版本号。</summary>
     /// <value>遵循语义化版本规范，格式为 Major.Minor.Patch。</value>
-    public const string Version = "1.2.0";
+    public const string Version = "1.3.0";
 
     /// <summary>软件作者名称。</summary>
     /// <value>固定值 "WaterRun"。</value>
@@ -311,6 +323,9 @@ public static class Config
 
     /// <summary>LLM 自动立即执行开关设置项的存储键名。</summary>
     private const string KeyLlmAutoExecute = "LlmAutoExecute";
+
+    /// <summary>管理员运行方式设置项的存储键名。</summary>
+    private const string KeyAdminRunMode = "AdminRunMode";
 
     #endregion
 
@@ -648,6 +663,35 @@ public static class Config
             lock (_syncLock)
             {
                 _localSettings.Values[KeyScriptPlacement] = (int)value;
+            }
+        }
+    }
+
+    /// <summary>
+    /// 获取或设置以管理员身份运行时的提权方式。
+    /// </summary>
+    /// <value>
+    /// AdminRunMode 枚举值，默认为 WindowsSudo。
+    /// 设置时立即持久化到本地存储。
+    /// </value>
+    public static AdminRunMode AdminMode
+    {
+        get
+        {
+            lock (_syncLock)
+            {
+                return _localSettings.Values.TryGetValue(KeyAdminRunMode, out object? value)
+                       && value is int intValue
+                       && Enum.IsDefined(typeof(AdminRunMode), intValue)
+                    ? (AdminRunMode)intValue
+                    : AdminRunMode.WindowsSudo;
+            }
+        }
+        set
+        {
+            lock (_syncLock)
+            {
+                _localSettings.Values[KeyAdminRunMode] = (int)value;
             }
         }
     }
@@ -1170,6 +1214,18 @@ public static class Config
         _ => placement.ToString(),
     };
 
+    /// <summary>
+    /// 获取管理员运行方式枚举值的本地化显示名称。
+    /// </summary>
+    /// <param name="mode">管理员运行方式枚举值。</param>
+    /// <returns>本地化后的显示名称字符串。</returns>
+    public static string GetAdminRunModeDisplayName(AdminRunMode mode) => mode switch
+    {
+        AdminRunMode.WindowsSudo => "Windows Sudo",
+        AdminRunMode.ElevatedTerminal => Text.Localize("启动管理员终端"),
+        _ => mode.ToString(),
+    };
+
     #endregion
 
     #region 重置方法
@@ -1197,6 +1253,7 @@ public static class Config
             _localSettings.Values[KeyAutoCloseTerminalOnCompletion] = false;
             _localSettings.Values[KeyShellType] = (int)ShellType.PowerShellUtf8;
             _localSettings.Values[KeyScriptPlacement] = (int)ScriptPlacementBehavior.EnsureCleanup;
+            _localSettings.Values[KeyAdminRunMode] = (int)AdminRunMode.WindowsSudo;
             _localSettings.Values[KeyLlmApiKey] = string.Empty;
             _localSettings.Values[KeyLlmBaseUrl] = DefaultLlmBaseUrl;
             _localSettings.Values[KeyLlmModel] = DefaultLlmModel;

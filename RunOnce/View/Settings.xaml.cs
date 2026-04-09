@@ -4,7 +4,7 @@
  *
  * @author: WaterRun
  * @file: View/Settings.xaml.cs
- * @date: 2026-03-27
+ * @date: 2026-04-09
  */
 
 #nullable enable
@@ -363,10 +363,10 @@ public sealed partial class Settings : Page
         StackPanel panel = new() { Spacing = 8, MinWidth = 380 };
 
         AddShortcutRow(panel, "Ctrl+Enter", Text.Localize("执行代码"));
+        AddShortcutRow(panel, "Shift+Ctrl+Enter", Text.Localize("管理员运行"));
         AddShortcutRow(panel, "Ctrl+L", Text.Localize("大模型生成代码"));
         AddShortcutRow(panel, "Ctrl+S", Text.Localize("设置"));
         AddShortcutRow(panel, "Ctrl+E", Text.Localize("命令行参数"));
-        AddShortcutRow(panel, "Ctrl+Y", Text.Localize("重做"));
         AddShortcutRow(panel, "Ctrl+A", Text.Localize("全选"));
         AddShortcutRow(panel, "Ctrl+C", Text.Localize("复制"));
         AddShortcutRow(panel, "Ctrl+V", Text.Localize("粘贴"));
@@ -439,7 +439,7 @@ public sealed partial class Settings : Page
     }
 
     /// <summary>
-    /// 构建并返回包含临时文件前缀、置信度阈值与语言执行命令编辑控件的高级设置 <see cref="ContentDialog"/>。
+    /// 构建并返回包含临时文件前缀、置信度阈值、管理员运行方式与语言执行命令编辑控件的高级设置 <see cref="ContentDialog"/>。
     /// </summary>
     /// <returns>已配置好内容区域、保存与取消按钮及输入校验逻辑的高级设置对话框实例。</returns>
     private ContentDialog BuildAdvancedSettingsDialog()
@@ -472,10 +472,22 @@ public sealed partial class Settings : Page
         thresholdPanel.Children.Add(thresholdBox);
         contentPanel.Children.Add(thresholdPanel);
 
+        List<string> adminModeItems = Enum.GetValues<AdminRunMode>()
+            .Select(Config.GetAdminRunModeDisplayName)
+            .ToList();
+        ComboBox adminModeBox = new()
+        {
+            Header = Text.Localize("管理员运行方式"),
+            ItemsSource = adminModeItems,
+            SelectedIndex = (int)Config.AdminMode,
+            MinWidth = 200,
+        };
+        contentPanel.Children.Add(adminModeBox);
+
         (StackPanel commandsPanel, Dictionary<string, TextBox> commandTextBoxes) = BuildLanguageCommandControls();
         contentPanel.Children.Add(commandsPanel);
 
-        HyperlinkButton resetLink = BuildResetAdvancedLink(prefixTextBox, thresholdBox, commandTextBoxes);
+        HyperlinkButton resetLink = BuildResetAdvancedLink(prefixTextBox, thresholdBox, commandTextBoxes, adminModeBox);
         contentPanel.Children.Add(resetLink);
 
         TextBlock errorText = new()
@@ -516,6 +528,11 @@ public sealed partial class Settings : Page
                     kvp => kvp.Value.Text);
 
                 ViewModel.SaveAdvancedSettings(prefixTextBox.Text, thresholdBox.Value, commands);
+
+                if (adminModeBox.SelectedIndex >= 0)
+                {
+                    Config.AdminMode = (AdminRunMode)adminModeBox.SelectedIndex;
+                }
             }
             catch (Exception ex)
             {
@@ -575,11 +592,13 @@ public sealed partial class Settings : Page
     /// <param name="prefixTextBox">临时文件名前缀输入框，非空，重置时更新其 <see cref="TextBox.Text"/>。</param>
     /// <param name="thresholdBox">置信度阈值数值输入框，非空，重置时更新其 <see cref="NumberBox.Value"/>。</param>
     /// <param name="commandTextBoxes">以语言名为键、命令输入框为值的字典，非空，重置时批量更新各 <see cref="TextBox.Text"/>。</param>
+    /// <param name="adminModeBox">管理员运行方式下拉框，非空，重置时恢复默认选项。</param>
     /// <returns>已绑定点击重置事件的 <see cref="HyperlinkButton"/> 实例。</returns>
     private HyperlinkButton BuildResetAdvancedLink(
         TextBox prefixTextBox,
         NumberBox thresholdBox,
-        Dictionary<string, TextBox> commandTextBoxes)
+        Dictionary<string, TextBox> commandTextBoxes,
+        ComboBox adminModeBox)
     {
         HyperlinkButton resetLink = new()
         {
@@ -594,6 +613,7 @@ public sealed partial class Settings : Page
 
             prefixTextBox.Text = prefix;
             thresholdBox.Value = threshold;
+            adminModeBox.SelectedIndex = (int)AdminRunMode.WindowsSudo;
 
             foreach ((string language, TextBox textBox) in commandTextBoxes)
             {

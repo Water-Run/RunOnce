@@ -4,7 +4,7 @@
  *
  * @author: WaterRun
  * @file: View/Editor.xaml.cs
- * @date: 2026-03-28
+ * @date: 2026-04-09
  */
 
 #nullable enable
@@ -1564,14 +1564,15 @@ public sealed partial class Editor : Page
 
     #region 执行流程
 
-    /// <summary>
+/// <summary>
     /// 处理执行请求，由 MainWindow 的运行按钮和 Ctrl+Enter 调用。
     /// </summary>
+    /// <param name="asAdmin">是否以管理员身份执行，默认为 false。</param>
     /// <remarks>
     /// 采用 async void 以适配事件处理器调用模式；通过 <see cref="_isExecuting"/> 防止重入。
     /// 涉及 I/O：创建临时文件并启动终端进程。
     /// </remarks>
-    public async void HandleExecuteRequest()
+    public async void HandleExecuteRequest(bool asAdmin = false)
     {
         if (_isExecuting || XamlRoot is null)
         {
@@ -1623,7 +1624,7 @@ public sealed partial class Editor : Page
 
             try
             {
-                ViewModel.Execute(code, language);
+                ViewModel.Execute(code, language, asAdmin);
             }
             catch (Exception ex)
             {
@@ -1944,6 +1945,7 @@ public sealed partial class Editor : Page
     {
         PlaceholderText.Text = Text.Localize("在此粘贴代码");
         PlaceholderSubText.Text = Text.Localize("右键或Ctrl+V");
+        PlaceholderRunHint.Text = "Ctrl+Enter " + Text.Localize("运行");
     }
 
     /// <summary>

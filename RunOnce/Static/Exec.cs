@@ -4,7 +4,7 @@
  *
  * @author: WaterRun
  * @file: Static/Exec.cs
- * @date: 2026-03-11
+ * @date: 2026-04-09
  */
 
 #nullable enable
@@ -72,12 +72,13 @@ public static class Exec
     /// <param name="language">脚本语言标识符，必须在 <see cref="Config.SupportedLanguages"/> 中并且非空白。</param>
     /// <param name="workingDirectory">执行工作目录，不能为空白且必须存在。</param>
     /// <param name="arguments">传递给脚本的命令行参数，为 null 或空白时不传递参数。</param>
+    /// <param name="asAdmin">是否以管理员身份执行，为 true 时根据 <see cref="Config.AdminMode"/> 决定提权方式。</param>
     /// <exception cref="ArgumentNullException">当 code、language 或 workingDirectory 为 null 时抛出。</exception>
     /// <exception cref="ArgumentException">当任一参数不满足非空白或工作目录不存在时抛出。</exception>
     /// <exception cref="IOException">当临时脚本文件无法在目标目录创建时抛出。</exception>
     /// <exception cref="InvalidOperationException">当终端进程无法启动时抛出。</exception>
     /// <remarks>线程安全：方法无共享可变状态。副作用：在文件系统创建临时文件并启动外部终端进程。</remarks>
-    public static void Execute(string code, string language, string workingDirectory, string? arguments = null)
+    public static void Execute(string code, string language, string workingDirectory, string? arguments = null, bool asAdmin = false)
     {
         ArgumentNullException.ThrowIfNull(code);
         ArgumentNullException.ThrowIfNull(language);
@@ -114,7 +115,7 @@ public static class Exec
         string? sanitizedArgs = string.IsNullOrWhiteSpace(arguments) ? null : arguments;
         (string shellExe, string shellArgs) = BuildShellLaunchInfo(languageCommand, tempFilePath, sanitizedArgs);
 
-        LaunchInTerminal(shellExe, shellArgs, workingDirectory);
+        LaunchInTerminal(shellExe, shellArgs, workingDirectory, asAdmin);
     }
 
     /// <summary>清理系统临时目录中所有以配置前缀开头的残留临时脚本文件。</summary>
@@ -268,10 +269,11 @@ public static class Exec
     /// <param name="shellExe">Shell 可执行文件名或路径。</param>
     /// <param name="shellArgs">Shell 启动参数。</param>
     /// <param name="workingDirectory">终端工作目录。</param>
+    /// <param name="asAdmin">是否以管理员身份启动。</param>
     /// <exception cref="InvalidOperationException">无法启动终端时抛出。</exception>
-    private static void LaunchInTerminal(string shellExe, string shellArgs, string workingDirectory)
+    private static void LaunchInTerminal(string shellExe, string shellArgs, string workingDirectory, bool asAdmin = false)
     {
-        ProcessStartInfo startInfo = CreateWindowsTerminalStartInfo(shellExe, shellArgs, workingDirectory);
+        ProcessStartInfo startInfo = CreateWindowsTerminalStartInfo(shellExe, shellArgs, workingDirectory, asAdmin);
 
         try
         {
@@ -283,19 +285,35 @@ public static class Exec
         }
     }
 
-    /// <summary>构建 Windows Terminal 启动信息。</summary>
+    /// <summary>构建 Windows Terminal 启动信息，支持管理员模式。</summary>
     /// <param name="shellExe">Shell 可执行文件名。</param>
     /// <param name="shellArgs">Shell 参数。</param>
     /// <param name="workingDirectory">目标工作目录。</param>
+    /// <param name="asAdmin">是否以管理员身份启动。</param>
     /// <returns>配置完成的 <see cref="ProcessStartInfo"/>。</returns>
-    private static ProcessStartInfo CreateWindowsTerminalStartInfo(string shellExe, string shellArgs, string workingDirectory)
+    private static ProcessStartInfo CreateWindowsTerminalStartInfo(string shellExe, string shellArgs, string workingDirectory, bool asAdmin)
     {
-        return new ProcessStartInfo
+        ProcessStartInfo psi = new()
         {
             FileName = Config.WindowsTerminalExecutable,
             Arguments = $"-d \"{workingDirectory}\" {shellExe} {shellArgs}",
             UseShellExecute = true,
             CreateNoWindow = false,
         };
+
+        if (asAdmin)
+        {
+            switch (Config.AdminMode)
+            {
+                case AdminRunMode.WindowsSudo:
+                    psi.Arguments = $"-d \"{workingDirectory}\" sudo {shellExe} {shellArgs}";
+                    break;
+                case AdminRunMode.ElevatedTerminal:
+                    psi.Verb = "runas";
+                    break;
+            }
+        }
+
+        return psi;
     }
 }

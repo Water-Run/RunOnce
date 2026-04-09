@@ -4,7 +4,7 @@
  *
  * @author: WaterRun
  * @file: ViewModel/Editor.cs
- * @date: 2026-03-24
+ * @date: 2026-04-09
  */
 
 #nullable enable
@@ -293,15 +293,16 @@ public sealed class EditorViewModel : INotifyPropertyChanged
     }
 
     /// <summary>
-    /// 执行代码脚本，附带可选的命令行参数。
+    /// 执行代码脚本，附带可选的命令行参数与管理员提权。
     /// </summary>
     /// <param name="code">待执行的代码文本；不允许为 null；允许为空白字符串（将提前返回，不执行）；内部将规范化换行符为 \r\n。</param>
     /// <param name="language">目标语言标识符；不允许为 null；允许为空字符串（将提前返回）；应为 <see cref="Config"/> 支持的有效语言标识。</param>
+    /// <param name="asAdmin">是否以管理员身份执行；默认为 false。</param>
     /// <exception cref="ArgumentNullException">当 code 或 language 为 null 时抛出。</exception>
     /// <exception cref="ArgumentException">当参数为空白字符串或语言不在支持列表中时抛出。</exception>
     /// <exception cref="IOException">当临时文件创建失败时抛出。</exception>
     /// <exception cref="InvalidOperationException">当终端启动失败时抛出。</exception>
-    public void Execute(string code, string language)
+    public void Execute(string code, string language, bool asAdmin = false)
     {
         ArgumentNullException.ThrowIfNull(code);
         ArgumentNullException.ThrowIfNull(language);
@@ -318,7 +319,7 @@ public sealed class EditorViewModel : INotifyPropertyChanged
 
         string? arguments = string.IsNullOrWhiteSpace(_commandLineArguments) ? null : _commandLineArguments;
 
-        Exec.Execute(normalizedCode, language, WorkingDirectory, arguments);
+        Exec.Execute(normalizedCode, language, WorkingDirectory, arguments, asAdmin);
     }
 
     /// <summary>

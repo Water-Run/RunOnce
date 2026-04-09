@@ -107,7 +107,15 @@
                     Opacity="0.25"
                     FontSize="14"
                     FontFamily="Cascadia Code, Cascadia Mono, Consolas, Courier New, monospace"/>
+                <TextBlock
+                    x:Name="PlaceholderRunHint"
+                    HorizontalAlignment="Center"
+                    Opacity="0.18"
+                    FontSize="12"
+                    Margin="0,4,0,0"
+                    FontFamily="Cascadia Code, Cascadia Mono, Consolas, Courier New, monospace"/>
             </StackPanel>
+
         </Grid>
 
         <!-- 底部状态栏 -->
