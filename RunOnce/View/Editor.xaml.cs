@@ -4,7 +4,7 @@
  *
  * @author: WaterRun
  * @file: View/Editor.xaml.cs
- * @date: 2026-04-09
+ * @date: 2026-04-10
  */
 
 #nullable enable
@@ -742,7 +742,11 @@ public sealed partial class Editor : Page
             if (e.Key == VirtualKey.Enter)
             {
                 e.Handled = true;
-                HandleExecuteRequest();
+
+                CoreVirtualKeyStates shiftState = InputKeyboardSource.GetKeyStateForCurrentThread(VirtualKey.Shift);
+                bool isShift = (shiftState & CoreVirtualKeyStates.Down) != 0;
+
+                HandleExecuteRequest(isShift);
                 return;
             }
 
@@ -800,7 +804,11 @@ public sealed partial class Editor : Page
     private void ExecuteAccelerator_Invoked(KeyboardAccelerator sender, KeyboardAcceleratorInvokedEventArgs args)
     {
         args.Handled = true;
-        HandleExecuteRequest();
+
+        CoreVirtualKeyStates shiftState = InputKeyboardSource.GetKeyStateForCurrentThread(VirtualKey.Shift);
+        bool isShift = (shiftState & CoreVirtualKeyStates.Down) != 0;
+
+        HandleExecuteRequest(isShift);
     }
 
     /// <summary>
