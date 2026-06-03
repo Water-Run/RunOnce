@@ -248,7 +248,7 @@ public sealed partial class Settings : Page
         ScriptPlacementLabel.Text = Text.Localize("脚本放置行为");
         ScriptPlacementDescription.Text = Text.Localize("选择临时代码文件的放置位置");
         AdvancedSettingsLabel.Text = Text.Localize("高级设置");
-        AdvancedSettingsDescription.Text = Text.Localize("配置临时文件、置信度阈值和语言命令");
+        AdvancedSettingsDescription.Text = Text.Localize("配置临时文件、管理员默认模式、置信度阈值和语言命令");
         AdvancedSettingsButton.Content = Text.Localize("打开");
 
         ApplyLlmLocalizedTexts();
@@ -362,8 +362,15 @@ public sealed partial class Settings : Page
     {
         StackPanel panel = new() { Spacing = 8, MinWidth = 380 };
 
-        AddShortcutRow(panel, "Ctrl+Enter", Text.Localize("执行代码"));
-        AddShortcutRow(panel, "Shift+Ctrl+Enter", Text.Localize("管理员运行"));
+        string defaultRunModeText = Config.RunAsAdminByDefault
+            ? Text.Localize("管理员运行")
+            : Text.Localize("执行代码");
+        string shiftedRunModeText = Config.RunAsAdminByDefault
+            ? Text.Localize("普通运行")
+            : Text.Localize("管理员运行");
+
+        AddShortcutRow(panel, "Ctrl+Enter", defaultRunModeText);
+        AddShortcutRow(panel, "Shift+Ctrl+Enter", shiftedRunModeText);
         AddShortcutRow(panel, "Ctrl+L", Text.Localize("大模型生成代码"));
         AddShortcutRow(panel, "Ctrl+S", Text.Localize("设置"));
         AddShortcutRow(panel, "Ctrl+E", Text.Localize("命令行参数"));
@@ -439,7 +446,7 @@ public sealed partial class Settings : Page
     }
 
     /// <summary>
-    /// 构建并返回包含临时文件前缀、置信度阈值、管理员运行方式与语言执行命令编辑控件的高级设置 <see cref="ContentDialog"/>。
+    /// 构建并返回包含临时文件前缀、置信度阈值、管理员运行方式、默认管理员运行模式与语言执行命令编辑控件的高级设置 <see cref="ContentDialog"/>。
     /// </summary>
     /// <returns>已配置好内容区域、保存与取消按钮及输入校验逻辑的高级设置对话框实例。</returns>
     private ContentDialog BuildAdvancedSettingsDialog()
@@ -484,10 +491,19 @@ public sealed partial class Settings : Page
         };
         contentPanel.Children.Add(adminModeBox);
 
+        ToggleSwitch runAsAdminDefaultSwitch = new()
+        {
+            Header = Text.Localize("以管理员运行作为默认模式"),
+            IsOn = Config.RunAsAdminByDefault,
+            OnContent = null,
+            OffContent = null,
+        };
+        contentPanel.Children.Add(runAsAdminDefaultSwitch);
+
         (StackPanel commandsPanel, Dictionary<string, TextBox> commandTextBoxes) = BuildLanguageCommandControls();
         contentPanel.Children.Add(commandsPanel);
 
-        HyperlinkButton resetLink = BuildResetAdvancedLink(prefixTextBox, thresholdBox, commandTextBoxes, adminModeBox);
+        HyperlinkButton resetLink = BuildResetAdvancedLink(prefixTextBox, thresholdBox, commandTextBoxes, adminModeBox, runAsAdminDefaultSwitch);
         contentPanel.Children.Add(resetLink);
 
         TextBlock errorText = new()
@@ -533,6 +549,8 @@ public sealed partial class Settings : Page
                 {
                     Config.AdminMode = (AdminRunMode)adminModeBox.SelectedIndex;
                 }
+
+                Config.RunAsAdminByDefault = runAsAdminDefaultSwitch.IsOn;
             }
             catch (Exception ex)
             {
@@ -593,12 +611,14 @@ public sealed partial class Settings : Page
     /// <param name="thresholdBox">置信度阈值数值输入框，非空，重置时更新其 <see cref="NumberBox.Value"/>。</param>
     /// <param name="commandTextBoxes">以语言名为键、命令输入框为值的字典，非空，重置时批量更新各 <see cref="TextBox.Text"/>。</param>
     /// <param name="adminModeBox">管理员运行方式下拉框，非空，重置时恢复默认选项。</param>
+    /// <param name="runAsAdminDefaultSwitch">默认管理员运行开关，非空，重置时恢复关闭。</param>
     /// <returns>已绑定点击重置事件的 <see cref="HyperlinkButton"/> 实例。</returns>
     private HyperlinkButton BuildResetAdvancedLink(
         TextBox prefixTextBox,
         NumberBox thresholdBox,
         Dictionary<string, TextBox> commandTextBoxes,
-        ComboBox adminModeBox)
+        ComboBox adminModeBox,
+        ToggleSwitch runAsAdminDefaultSwitch)
     {
         HyperlinkButton resetLink = new()
         {
@@ -609,11 +629,12 @@ public sealed partial class Settings : Page
 
         resetLink.Click += (_, _) =>
         {
-            (string prefix, double threshold, Dictionary<string, string> commands) = ViewModel.ResetAdvancedToDefaults();
+            (string prefix, double threshold, bool runAsAdminByDefault, Dictionary<string, string> commands) = ViewModel.ResetAdvancedToDefaults();
 
             prefixTextBox.Text = prefix;
             thresholdBox.Value = threshold;
             adminModeBox.SelectedIndex = (int)AdminRunMode.WindowsSudo;
+            runAsAdminDefaultSwitch.IsOn = runAsAdminByDefault;
 
             foreach ((string language, TextBox textBox) in commandTextBoxes)
             {

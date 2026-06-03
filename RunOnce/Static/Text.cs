@@ -96,7 +96,7 @@ public static class Text
         ["脚本放置行为"] = "Script Placement",
         ["选择临时代码文件的放置位置"] = "Choose where temporary code files are placed",
         ["高级设置"] = "Advanced Settings",
-        ["配置临时文件、置信度阈值和语言命令"] = "Configure the temporary file, confidence threshold, and language commands",
+        ["配置临时文件、管理员默认模式、置信度阈值和语言命令"] = "Configure temporary files, admin defaults, confidence threshold, and language commands",
         ["打开"] = "Open",
 
         // 设置页面 - 快捷键
@@ -244,8 +244,10 @@ public static class Text
 
         // 管理员运行
         ["管理员运行"] = "Run as Admin",
+        ["普通运行"] = "Run Normally",
         ["启动管理员终端"] = "Launch Admin Terminal",
         ["管理员运行方式"] = "Admin Run Mode",
+        ["以管理员运行作为默认模式"] = "Use Run as Admin as the default mode",
     };
 
     /// <summary>

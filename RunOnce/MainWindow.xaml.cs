@@ -206,7 +206,10 @@ public sealed partial class MainWindow : Window
         AppTitleTextBlock.Text = appName;
         ToolTipService.SetToolTip(ArgsButton, $"{Text.Localize("命令行参数")} (Ctrl+E)");
         ToolTipService.SetToolTip(LlmButton, $"{Text.Localize("大模型生成代码")} (Ctrl+L)");
-        ToolTipService.SetToolTip(RunButton, $"{Text.Localize("运行")} (Ctrl+Enter)\nShift: {Text.Localize("管理员运行")}");
+        string shiftRunModeText = Config.RunAsAdminByDefault
+            ? Text.Localize("普通运行")
+            : Text.Localize("管理员运行");
+        ToolTipService.SetToolTip(RunButton, $"{Text.Localize("运行")} (Ctrl+Enter)\nShift: {shiftRunModeText}");
         ToolTipService.SetToolTip(SettingsButton, $"{Text.Localize("设置")} (Ctrl+S)");
     }
 
@@ -319,7 +322,7 @@ public sealed partial class MainWindow : Window
     }
 
     /// <summary>
-    /// 运行按钮点击事件处理程序，检测 Shift 键以支持管理员运行。
+    /// 运行按钮点击事件处理程序，检测 Shift 键以临时反转管理员运行模式。
     /// </summary>
     /// <param name="sender">事件源对象。</param>
     /// <param name="e">路由事件参数。</param>

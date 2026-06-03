@@ -468,14 +468,16 @@ public sealed class SettingsViewModel : INotifyPropertyChanged
     /// <summary>
     /// 将高级设置全部重置为默认值，并返回重置后的当前配置值。
     /// </summary>
-    /// <returns>包含重置后的临时文件前缀、置信度阈值及完整语言命令字典的元组；各字段均不为 null。</returns>
-    public (string Prefix, double Threshold, Dictionary<string, string> Commands) ResetAdvancedToDefaults()
+    /// <returns>包含重置后的临时文件前缀、置信度阈值、默认管理员运行模式及完整语言命令字典的元组；各字段均不为 null。</returns>
+    public (string Prefix, double Threshold, bool RunAsAdminByDefault, Dictionary<string, string> Commands) ResetAdvancedToDefaults()
     {
         Config.TempFilePrefix = Config.DefaultTempFilePrefix;
         Config.ConfidenceThreshold = Config.DefaultConfidenceThreshold;
+        Config.AdminMode = AdminRunMode.WindowsSudo;
+        Config.RunAsAdminByDefault = false;
         Config.ResetAllLanguageCommands();
 
-        return (Config.DefaultTempFilePrefix, Config.DefaultConfidenceThreshold, Config.GetAllLanguageCommands());
+        return (Config.DefaultTempFilePrefix, Config.DefaultConfidenceThreshold, false, Config.GetAllLanguageCommands());
     }
 
     #endregion

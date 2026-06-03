@@ -1575,12 +1575,12 @@ public sealed partial class Editor : Page
 /// <summary>
     /// 处理执行请求，由 MainWindow 的运行按钮和 Ctrl+Enter 调用。
     /// </summary>
-    /// <param name="asAdmin">是否以管理员身份执行，默认为 false。</param>
+    /// <param name="invertAdminMode">是否临时反转默认管理员运行模式，默认为 false。</param>
     /// <remarks>
     /// 采用 async void 以适配事件处理器调用模式；通过 <see cref="_isExecuting"/> 防止重入。
     /// 涉及 I/O：创建临时文件并启动终端进程。
     /// </remarks>
-    public async void HandleExecuteRequest(bool asAdmin = false)
+    public async void HandleExecuteRequest(bool invertAdminMode = false)
     {
         if (_isExecuting || XamlRoot is null)
         {
@@ -1632,6 +1632,7 @@ public sealed partial class Editor : Page
 
             try
             {
+                bool asAdmin = Config.RunAsAdminByDefault != invertAdminMode;
                 ViewModel.Execute(code, language, asAdmin);
             }
             catch (Exception ex)

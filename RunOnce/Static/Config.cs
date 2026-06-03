@@ -168,7 +168,7 @@ public static class Config
 
     /// <summary>软件的当前版本号。</summary>
     /// <value>遵循语义化版本规范，格式为 Major.Minor.Patch。</value>
-    public const string Version = "1.3.0";
+    public const string Version = "1.3.1";
 
     /// <summary>软件作者名称。</summary>
     /// <value>固定值 "WaterRun"。</value>
@@ -326,6 +326,9 @@ public static class Config
 
     /// <summary>管理员运行方式设置项的存储键名。</summary>
     private const string KeyAdminRunMode = "AdminRunMode";
+
+    /// <summary>默认以管理员身份运行设置项的存储键名。</summary>
+    private const string KeyRunAsAdminByDefault = "RunAsAdminByDefault";
 
     #endregion
 
@@ -692,6 +695,33 @@ public static class Config
             lock (_syncLock)
             {
                 _localSettings.Values[KeyAdminRunMode] = (int)value;
+            }
+        }
+    }
+
+    /// <summary>
+    /// 获取或设置是否默认以管理员身份运行脚本。
+    /// </summary>
+    /// <value>
+    /// 布尔值，true 表示默认管理员运行且 Shift 临时切换为普通运行；false 表示默认普通运行且 Shift 临时切换为管理员运行。
+    /// 默认为 false（关闭）。设置时立即持久化到本地存储。
+    /// </value>
+    public static bool RunAsAdminByDefault
+    {
+        get
+        {
+            lock (_syncLock)
+            {
+                return _localSettings.Values.TryGetValue(KeyRunAsAdminByDefault, out object? value)
+                       && value is bool boolValue
+                       && boolValue;
+            }
+        }
+        set
+        {
+            lock (_syncLock)
+            {
+                _localSettings.Values[KeyRunAsAdminByDefault] = value;
             }
         }
     }
@@ -1254,6 +1284,7 @@ public static class Config
             _localSettings.Values[KeyShellType] = (int)ShellType.PowerShellUtf8;
             _localSettings.Values[KeyScriptPlacement] = (int)ScriptPlacementBehavior.EnsureCleanup;
             _localSettings.Values[KeyAdminRunMode] = (int)AdminRunMode.WindowsSudo;
+            _localSettings.Values[KeyRunAsAdminByDefault] = false;
             _localSettings.Values[KeyLlmApiKey] = string.Empty;
             _localSettings.Values[KeyLlmBaseUrl] = DefaultLlmBaseUrl;
             _localSettings.Values[KeyLlmModel] = DefaultLlmModel;
