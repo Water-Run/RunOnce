@@ -1,6 +1,6 @@
 ﻿/*
  * RunOnce Shell Extension
- * 实现 Windows 11 一级右键菜单项，在文件夹空白处显示 "在此运行代码" / "Run Code Here"
+ * 实现 Windows 11 一级右键菜单项，在文件夹空白处或文件夹项上显示 "在此运行代码" / "Run Code Here"
  * 通过 IExplorerCommand COM 接口向文件资源管理器注册上下文菜单命令
  *
  * 工作原理：

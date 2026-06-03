@@ -375,6 +375,8 @@ public sealed partial class Settings : Page
         AddShortcutRow(panel, "Ctrl+S", Text.Localize("设置"));
         AddShortcutRow(panel, "Ctrl+E", Text.Localize("命令行参数"));
         AddShortcutRow(panel, "Ctrl+A", Text.Localize("全选"));
+        AddShortcutRow(panel, "Ctrl+Z", Text.Localize("撤销"));
+        AddShortcutRow(panel, "Ctrl+Y", Text.Localize("重做"));
         AddShortcutRow(panel, "Ctrl+C", Text.Localize("复制"));
         AddShortcutRow(panel, "Ctrl+V", Text.Localize("粘贴"));
         AddShortcutRow(panel, "Ctrl+X", Text.Localize("剪切"));

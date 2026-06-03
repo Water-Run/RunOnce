@@ -409,6 +409,15 @@ public sealed partial class Editor : Page
 
         flyout.Items.Add(new MenuFlyoutSeparator());
 
+        MenuFlyoutItem undoItem = new()
+        {
+            Text = Text.Localize("撤销"),
+            Icon = new SymbolIcon(Symbol.Undo),
+            KeyboardAcceleratorTextOverride = "Ctrl+Z",
+        };
+        undoItem.Click += (_, _) => CodeEditor.Document.Undo();
+        flyout.Items.Add(undoItem);
+
         MenuFlyoutItem redoItem = new()
         {
             Text = Text.Localize("重做"),

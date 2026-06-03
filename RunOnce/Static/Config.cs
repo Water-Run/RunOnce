@@ -86,7 +86,7 @@ public enum ShellType
     /// <summary>PowerShell 5.x（powershell.exe），强制 UTF-8 编码。</summary>
     PowerShellUtf8,
 
-    /// <summary>PowerShell 7.x（pwsh.exe），原生 UTF-8。</summary>
+    /// <summary>PowerShell 7.x（pwsh.exe），系统默认编码。</summary>
     Pwsh,
 
     /// <summary>命令提示符（cmd.exe），系统默认编码。</summary>
@@ -94,6 +94,9 @@ public enum ShellType
 
     /// <summary>命令提示符（cmd.exe），强制 UTF-8 编码。</summary>
     CmdUtf8,
+
+    /// <summary>PowerShell 7.x（pwsh.exe），强制 UTF-8 编码。</summary>
+    PwshUtf8,
 }
 
 /// <summary>
@@ -168,7 +171,7 @@ public static class Config
 
     /// <summary>软件的当前版本号。</summary>
     /// <value>遵循语义化版本规范，格式为 Major.Minor.Patch。</value>
-    public const string Version = "1.3.1";
+    public const string Version = "1.4.0";
 
     /// <summary>软件作者名称。</summary>
     /// <value>固定值 "WaterRun"。</value>
@@ -1226,7 +1229,8 @@ public static class Config
     {
         ShellType.PowerShell => "PowerShell",
         ShellType.PowerShellUtf8 => "PowerShell (UTF-8)",
-        ShellType.Pwsh => "Pwsh (PowerShell 7)",
+        ShellType.Pwsh => "Pwsh",
+        ShellType.PwshUtf8 => "Pwsh (UTF-8)",
         ShellType.Cmd => Text.Localize("命令提示符"),
         ShellType.CmdUtf8 => Text.Localize("命令提示符") + " (UTF-8)",
         _ => shell.ToString(),

@@ -175,7 +175,8 @@ public static class Exec
         {
             ShellType.PowerShell => BuildPowerShellLaunchInfo("powershell.exe", languageCommand, tempFilePath, false, arguments),
             ShellType.PowerShellUtf8 => BuildPowerShellLaunchInfo("powershell.exe", languageCommand, tempFilePath, true, arguments),
-            ShellType.Pwsh => BuildPowerShellLaunchInfo("pwsh.exe", languageCommand, tempFilePath, true, arguments),
+            ShellType.Pwsh => BuildPowerShellLaunchInfo("pwsh.exe", languageCommand, tempFilePath, false, arguments),
+            ShellType.PwshUtf8 => BuildPowerShellLaunchInfo("pwsh.exe", languageCommand, tempFilePath, true, arguments),
             ShellType.Cmd => BuildCmdLaunchInfo(languageCommand, tempFilePath, false, arguments),
             ShellType.CmdUtf8 => BuildCmdLaunchInfo(languageCommand, tempFilePath, true, arguments),
             _ => BuildPowerShellLaunchInfo("powershell.exe", languageCommand, tempFilePath, false, arguments),

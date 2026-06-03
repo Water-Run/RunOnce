@@ -27,6 +27,9 @@ namespace RunOnce.Static;
 /// </remarks>
 public static class LlmClient
 {
+    /// <summary>连接验证请求使用的最大 Token 上限，避免低额度模型因默认生成上限过高拒绝请求。</summary>
+    private const int VerifyMaxTokens = 1024;
+
     /// <summary>
     /// 全局共享的 <see cref="HttpClient"/> 实例。
     /// 超时设为无限，由调用方通过 <see cref="CancellationToken"/> 控制取消与超时。
@@ -85,7 +88,7 @@ public static class LlmClient
             await SendChatRequestAsync(
                     systemContent,
                     "Generate a script that prints hello world.",
-                    Config.LlmMaxTokens,
+                    Math.Min(Config.LlmMaxTokens, VerifyMaxTokens),
                     Config.LlmTimeoutSeconds,
                     cancellationToken)
                 .ConfigureAwait(false);
@@ -215,7 +218,7 @@ public static class LlmClient
         int timeoutSeconds,
         CancellationToken cancellationToken)
     {
-        string apiKey = Config.LlmApiKey;
+        string apiKey = NormalizeBearerToken(Config.LlmApiKey);
         string baseUrl = Config.LlmBaseUrl.TrimEnd('/');
 
         var requestBody = new
@@ -229,7 +232,7 @@ public static class LlmClient
             max_tokens = maxTokens,
         };
 
-        using var request = new HttpRequestMessage(HttpMethod.Post, $"{baseUrl}/chat/completions");
+        using var request = new HttpRequestMessage(HttpMethod.Post, BuildChatCompletionsUrl(baseUrl));
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
         request.Content = new StringContent(
             JsonSerializer.Serialize(requestBody), Encoding.UTF8, "application/json");
@@ -284,6 +287,29 @@ public static class LlmClient
         return basePrompt;
     }
 
+    /// <summary>根据 API 基础地址构建 Chat Completions 请求地址。</summary>
+    /// <param name="baseUrl">已去除末尾斜杠的 API 基础地址。</param>
+    /// <returns>Chat Completions 请求地址。</returns>
+    private static string BuildChatCompletionsUrl(string baseUrl)
+    {
+        return baseUrl.EndsWith("/chat/completions", StringComparison.OrdinalIgnoreCase)
+            ? baseUrl
+            : $"{baseUrl}/chat/completions";
+    }
+
+    /// <summary>规范化用户输入的 API Key，兼容误粘贴的 Bearer 前缀。</summary>
+    /// <param name="apiKey">原始 API Key。</param>
+    /// <returns>不包含 Bearer 前缀的 Token。</returns>
+    private static string NormalizeBearerToken(string apiKey)
+    {
+        string trimmed = apiKey.Trim();
+        const string bearerPrefix = "Bearer ";
+
+        return trimmed.StartsWith(bearerPrefix, StringComparison.OrdinalIgnoreCase)
+            ? trimmed[bearerPrefix.Length..].Trim()
+            : trimmed;
+    }
+
     /// <summary>从成功的 API 响应 JSON 中提取助手回复内容。</summary>
     /// <param name="responseJson">API 返回的完整 JSON 响应。</param>
     /// <returns>提取的文本；解析失败时返回原始 JSON。</returns>
@@ -296,11 +322,33 @@ public static class LlmClient
 
             if (root.TryGetProperty("choices", out JsonElement choices)
                 && choices.ValueKind is JsonValueKind.Array
-                && choices.GetArrayLength() > 0
-                && choices[0].TryGetProperty("message", out JsonElement message)
-                && message.TryGetProperty("content", out JsonElement content))
+                && choices.GetArrayLength() > 0)
             {
-                return StripMarkdownCodeBlock(content.GetString() ?? string.Empty);
+                JsonElement firstChoice = choices[0];
+
+                if (firstChoice.TryGetProperty("message", out JsonElement message)
+                    && TryReadResponseText(message, out string messageText))
+                {
+                    return StripMarkdownCodeBlock(messageText);
+                }
+
+                if (firstChoice.TryGetProperty("text", out JsonElement text)
+                    && text.ValueKind is JsonValueKind.String)
+                {
+                    return StripMarkdownCodeBlock(text.GetString() ?? string.Empty);
+                }
+
+                if (firstChoice.TryGetProperty("delta", out JsonElement delta)
+                    && TryReadResponseText(delta, out string deltaText))
+                {
+                    return StripMarkdownCodeBlock(deltaText);
+                }
+            }
+
+            if (root.TryGetProperty("output_text", out JsonElement outputText)
+                && outputText.ValueKind is JsonValueKind.String)
+            {
+                return StripMarkdownCodeBlock(outputText.GetString() ?? string.Empty);
             }
         }
         catch (JsonException)
@@ -309,6 +357,51 @@ public static class LlmClient
         }
 
         return responseJson;
+    }
+
+    /// <summary>从消息对象中读取文本内容，兼容字符串与分段数组两种 content 结构。</summary>
+    /// <param name="message">消息或增量消息 JSON 对象。</param>
+    /// <param name="text">读取到的文本。</param>
+    /// <returns>成功读取到文本时为 true，否则为 false。</returns>
+    private static bool TryReadResponseText(JsonElement message, out string text)
+    {
+        text = string.Empty;
+
+        if (!message.TryGetProperty("content", out JsonElement content))
+        {
+            return false;
+        }
+
+        if (content.ValueKind is JsonValueKind.String)
+        {
+            text = content.GetString() ?? string.Empty;
+            return true;
+        }
+
+        if (content.ValueKind is not JsonValueKind.Array)
+        {
+            return false;
+        }
+
+        StringBuilder builder = new();
+        foreach (JsonElement part in content.EnumerateArray())
+        {
+            if (part.ValueKind is JsonValueKind.String)
+            {
+                builder.Append(part.GetString());
+                continue;
+            }
+
+            if (part.ValueKind is JsonValueKind.Object
+                && part.TryGetProperty("text", out JsonElement partText)
+                && partText.ValueKind is JsonValueKind.String)
+            {
+                builder.Append(partText.GetString());
+            }
+        }
+
+        text = builder.ToString();
+        return text.Length > 0;
     }
 
     /// <summary>从错误响应 JSON 中提取错误消息。</summary>
@@ -321,10 +414,24 @@ public static class LlmClient
             using JsonDocument doc = JsonDocument.Parse(responseJson);
             JsonElement root = doc.RootElement;
 
-            if (root.TryGetProperty("error", out JsonElement error)
-                && error.TryGetProperty("message", out JsonElement message))
+            if (root.TryGetProperty("error", out JsonElement error))
             {
-                return message.GetString() ?? responseJson;
+                if (error.ValueKind is JsonValueKind.String)
+                {
+                    return error.GetString() ?? responseJson;
+                }
+
+                if (error.ValueKind is JsonValueKind.Object
+                    && error.TryGetProperty("message", out JsonElement message))
+                {
+                    return message.GetString() ?? responseJson;
+                }
+            }
+
+            if (root.TryGetProperty("message", out JsonElement rootMessage)
+                && rootMessage.ValueKind is JsonValueKind.String)
+            {
+                return rootMessage.GetString() ?? responseJson;
             }
         }
         catch (JsonException)
