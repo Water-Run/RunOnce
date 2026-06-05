@@ -43,7 +43,7 @@ namespace RunOnce.View;
 /// 语法高亮通过 80ms 去抖定时器异步应用，仅处理视窗内及上下缓冲区的文本，不阻塞用户输入；
 /// 在鼠标拖动选区期间完全暂停高亮，鼠标释放后延迟一帧再补做；
 /// 格式化操作前后保存并恢复 ScrollViewer 滚动位置，防止视口抖动；
-/// 右键菜单已替换为仅包含代码编辑操作的自定义菜单，空编辑器下右键直接粘贴。
+/// 右键菜单已替换为仅包含代码编辑操作的自定义菜单。
 /// 线程安全：所有成员必须在 UI 线程访问。
 /// 副作用：高亮操作修改 RichEditBox 的字符格式；执行操作创建临时文件并启动终端进程。
 /// </remarks>
@@ -325,17 +325,9 @@ public sealed partial class Editor : Page
     /// </summary>
     /// <param name="sender">事件源。</param>
     /// <param name="args">上下文请求事件参数，将被标记为已处理。</param>
-    private async void CodeEditor_ContextRequested(UIElement sender, ContextRequestedEventArgs args)
+    private void CodeEditor_ContextRequested(UIElement sender, ContextRequestedEventArgs args)
     {
         args.Handled = true;
-
-        string text = GetPlainText();
-        if (string.IsNullOrEmpty(text))
-        {
-            await PasteTextFromClipboardAsync();
-            return;
-        }
-
         ShowCodeContextMenu(args);
     }
 
@@ -394,6 +386,7 @@ public sealed partial class Editor : Page
     /// <param name="args">上下文请求事件参数，用于获取菜单弹出位置。</param>
     private void ShowCodeContextMenu(ContextRequestedEventArgs args)
     {
+        bool hasText = !string.IsNullOrEmpty(GetPlainText());
         bool hasSelection = CodeEditor.Document.Selection.StartPosition != CodeEditor.Document.Selection.EndPosition;
 
         MenuFlyout flyout = new();
@@ -455,7 +448,7 @@ public sealed partial class Editor : Page
             Icon = new SymbolIcon(Symbol.Paste),
             KeyboardAcceleratorTextOverride = "Ctrl+V",
         };
-        pasteItem.Click += (_, _) => CodeEditor.Document.Selection.Paste(0);
+        pasteItem.Click += (_, _) => _ = PasteTextFromClipboardAsync();
         flyout.Items.Add(pasteItem);
 
         flyout.Items.Add(new MenuFlyoutSeparator());
@@ -464,6 +457,7 @@ public sealed partial class Editor : Page
         {
             Text = Text.Localize("全选"),
             KeyboardAcceleratorTextOverride = "Ctrl+A",
+            IsEnabled = hasText,
         };
         selectAllItem.Click += (_, _) =>
         {

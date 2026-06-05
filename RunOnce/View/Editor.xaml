@@ -62,6 +62,7 @@
                 AcceptsReturn="True"
                 IsSpellCheckEnabled="False"
                 SelectionFlyout="{x:Null}"
+                ContextFlyout="{x:Null}"
                 TextWrapping="NoWrap"
                 FontFamily="Cascadia Code, Cascadia Mono, Consolas, Courier New, monospace"
                 FontSize="18"
@@ -156,4 +157,3 @@
         </Grid>
     </Grid>
 </Page>
-    

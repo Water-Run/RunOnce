@@ -347,10 +347,10 @@ public static class Config
     public const double DefaultConfidenceThreshold = 0.85;
 
     /// <summary>LLM API 基础 URL 的默认值（OpenAI 兼容端点）。</summary>
-    public const string DefaultLlmBaseUrl = "https://api.poe.com/v1";
+    public const string DefaultLlmBaseUrl = "https://api.deepseek.com";
 
     /// <summary>LLM 模型名称的默认值。</summary>
-    public const string DefaultLlmModel = "claude-opus-4.6";
+    public const string DefaultLlmModel = "deepseek-v4-pro";
 
     /// <summary>LLM 单次请求最大 Token 数的默认值。</summary>
     public const int DefaultLlmMaxTokens = 16384;
@@ -799,7 +799,7 @@ public static class Config
     /// 获取或设置 LLM API 基础 URL（OpenAI 兼容端点）。
     /// </summary>
     /// <value>
-    /// 字符串，默认为 "https://api.openai.com/v1"。
+    /// 字符串，默认为 <see cref="DefaultLlmBaseUrl"/>。
     /// 设置时立即持久化到本地存储。
     /// </value>
     public static string LlmBaseUrl
@@ -830,7 +830,7 @@ public static class Config
     /// 获取或设置 LLM 模型名称。
     /// </summary>
     /// <value>
-    /// 字符串，默认为 "gpt-4o-mini"。
+    /// 字符串，默认为 <see cref="DefaultLlmModel"/>。
     /// 设置时立即持久化到本地存储。
     /// </value>
     public static string LlmModel
